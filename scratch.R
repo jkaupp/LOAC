@@ -8,16 +8,37 @@ library(data.table)
 library(stringr)
 library(readxl)
 library(rio)
+library(tidyr)
 
 read.files <- . %>%
 {
   read_excel(paste0(base.dir,"CLA+/Queens CLA+.xlsx"),.,skip = 0)
 }
 
+base.dir <- "~/ownCloud/Engineering Education Research/HEQCO/LOAC Project/" 
+
+
 apsc.100.group.consent <- ddply(apsc.100,.(team,semester), summarise, consent=min(consent)) %>% 
   filter(consent>1)
-  
-  
+
+
+TLO <- import(paste0(base.dir,"TLO/TLO Master.csv"))
+
+TLO %>% 
+  separate(Collector,c("subject","course")," ")
+
+
+
+consenting <- master %>% 
+  unite(Course, c(subject, course), sep = " ") %>% 
+  rename(course = Course) %>% 
+  filter(consent>=2) %>% 
+  select(course, studentid, consent) 
+
+            
+
+semi_join(TLO,consenting, by=c("studentid","course")) %>% 
+  write.csv('Consenting TLO.csv')
 
 
 VALUE <- read.csv("/Users/Jake/ownCloud/Engineering Education Research/HEQCO/LOAC Project/VALUE/2014_VALUE_CLA_1-4_all.csv")
@@ -30,24 +51,20 @@ apsc100.value.id <- VALUE %>%
 
 
 
- master %>% 
-  filter(program=="BSCE", test=="CLA+", course!='103', consent>=2) %>% 
-  unique() %>% 
-  select(-name,-email) %>% 
-  write.csv("Engineering Student Info.csv")
-
-eng.ids<-master %>% 
-  filter(program=="BSCE", test=="CLA+", consent>=2) %>% 
-  select(studentid) %>% 
-  tbl_df()
-  
-cla.data %<>% 
+ids <- student.info %>% 
+  filter(test=="CLA+", course!='103', consent>=2) %>% 
   tbl_df()
 
-cla.data %>% 
-  semi_join(., eng.ids, by="studentid")  %>%
+
+temp<-cla.plus %>% 
+  semi_join(., ids, by=c("studentid", "year"))  %>%
   select(-contains("name"),-email) %>% 
-  write.csv("Engineering CLA+ Data.csv")
+  write.csv("CLA+ Data.csv")
+  
+
+temp2 <-cla.data %>% 
+  anti_join(ids, ., by="studentid") 
+
 
 
 
@@ -87,7 +104,10 @@ long.eng.cla %>%
   geom_line(stat = 'summary', fun.y = mean)
   
 
-  
+
+
+
+
 
 
 

@@ -5,6 +5,13 @@ library(magrittr)
 library(dplyr)
 library(data.table)
 
+read.files <- . %>%
+{
+  read_excel(paste0(base.dir,"CLA+/Queens CLA+.xlsx"),.,skip = 0)
+}
+
+
+
 # Establish MySQL Connection to LOAC Database ----
 con <- dbConnect(MySQL(), group='LOAC')
 
