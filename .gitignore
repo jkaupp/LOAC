@@ -10,6 +10,6 @@
 .Rproj.user
 packrat/lib*/
 packrat/src/
-.xlsx
-.csv
-.xls
+*.xlsx
+*.csv
+*.xls
