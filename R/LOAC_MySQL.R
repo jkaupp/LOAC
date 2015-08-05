@@ -2,8 +2,9 @@ library(DBI)
 library(RMySQL)
 library(xlsx)
 library(magrittr)
+library(stringr)
 library(dplyr)
-library(data.table)
+library(rio)
 
 read.files <- . %>%
 {
@@ -54,6 +55,13 @@ master <- rbindlist(list(apsc.100,apsc.200f,apsc.200w,apsc.480,civl.471,geoe.447
 master$email %<>%
   tolower()
 
+dram.400 <-paste0(base.dir,"FAS/DRAM 400.xlsx") %>% 
+  import(.,sheet="Master")
+
+dram.400$name %<>%
+  str_sub(10,str_length(.))
+
+
 # Read in the CLA+ Master Data ----
 cla.sheets <- paste0(base.dir,"CLA+/Queens CLA+.xlsx") %>% 
   excel_sheets
@@ -67,7 +75,7 @@ names(cla.data) %<>%
 
 
 # Write data to the student information table ----
-dbWriteTable(con, name = 'student_info', value = master, row.names = FALSE, overwrite = TRUE)
+dbWriteTable(con, name = 'student_info', value = dram.400, row.names = FALSE, append = TRUE)
 
 # Write data to the cla+ table ----
 dbWriteTable(con, name = 'cla_plus', value = cla.data, append = TRUE, row.names = FALSE)
