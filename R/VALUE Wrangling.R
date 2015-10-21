@@ -7,11 +7,10 @@ library(rio)
 library(tidyr)
 
 # Connections and Directories ----
-# Connection to LOAC Database 
-con <- dbConnect(MySQL(), group='LOAC')
+
 
 # Read in Student Info Table
-student_info <- dbReadTable(con,"student_info")
+student_info <- master
 
 # Directory for VALUE Rubric Data
 data.dir <- "/Users/Jake/ownCloud/Engineering Education Research/HEQCO/LOAC Project/VALUE/"
@@ -326,7 +325,5 @@ m.full.value$level[is.na(m.full.value$level)] <- 99
 m.full.value %<>%
   separate(course,c("subject","course"), sep=" ")
 
-## Upload to LOAC Database ----
-# dbWriteTable(con,"VALUE", m.full.value, row.names = FALSE)
 
   

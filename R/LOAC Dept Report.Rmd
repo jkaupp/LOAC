@@ -1,0 +1,129 @@
+---
+title: "HEQCO Learning Outcomes Project: Electrical & Computing Engineering"
+author: "Jake Kaupp"
+date: "`r Sys.Date()`"
+output: rmarkdown::tufte_handout
+---
+
+\vspace{40 mm}
+
+\newthought{The Higher Education Quality Council}[^heqco], created a consortium of three Universities and thee Colleges in Ontario, and tasked them with determining methods for assessing broad, high-level learning outcomes across an institution.  The Queen's Learning Outcomes Project[^qlop], is a four-year longitudinal study that is looking at methods to assess cognitive skills, such as Critical Thinking, Problem Solving, Written Communication and Lifelong Learning, in the Faculty of Arts and Science and the Faculty of Engineering and Applied Science.  There are a number of participating departments in both Faculties:
+
+* Department of Drama
+* Department of Psychology
+* Department of Physics
+* All 10 Departments in the Faculty of Engineering and Applied Science.
+
+The project tracks the 2013-2014 cohort of students as they progress through their undergraduate experience at Queen's, to investigate how students develop these skills over the duration of their undegradaute education and to determine the efficacy, efficiency and sustainability of each assessment method. 
+
+The results from the project offer a means of triangulating results from other assessment instruments, such as the National Survey of Student Engagement or Queen's Graduate Exit Survey, and offer evidence towards demonstrating student performance in CEAB's graduate attributes or the Council of Ontario Universities Degree Level Expectations.  This document presents a brief summary of each of the instruments, and a summary of the results for the Department of Electrical and Computing Engineering.
+
+\newpage
+
+# Assessment Tools
+
+The Queen's Learning Outcomes Project is using four tools to assess cognitive skills:
+
+* Standarized Instruments (The Collegiate Learning Assessment Plus and the Critical Thinking Assessment Test)
+* Program level meta-rubrics (The Valid Assessment of Learning in Undergradate Education or VALUE Rubrics)
+* Qualitiative Surveys (The Transferrable Learning Orientations Survey)
+
+## The Collegiate Learning Assessment Plus (CLA+)[^cla+] 
+
+The CLA+ is a 90 minute, standardized test that students take online.  The CLA+ is divided into two main tasks, each which are designed to measure a specific skills and abilities.  The first is a Performance task, in which students are placed in a scenario and are given a library of evidence.  They are asked to thoroughly read the evidence and then prepare their reponse for the scenario, which often has them support or refute a position or provide recommendations for potential action.  The second section of the CLA+ is a series of Selected-response questions, in which students are presented with a prompt and then asked to select a suitable respons from the options provided.  The questions ask students to evaluate claims, critique arguments, and interpret information. 
+
+## Interpreting CLA+ Scores
+The instrument is machine-scored, supplemented and checked by expert raters.  The results are presented as a set of absolute criterion referenced scores and subscores as well as a set of norm-referenced Mastery levels[^mastery]. 
+
+To better understand how to interpret the scores, consider the following.  Think of the absolute scores (Total Score, Performance Task Score, Selected Response Score) as the comparitive measure of the student to use their skills in concert, in a realistic setting.  The Mastery levels describe the characteristics and abilities, while the sub-scale scores measure how well the student performs in each specific skill.  You can have a student display excellent analytical reasoning and problem sovling, but poor written communication.  This would be reflected by a high sub-scale score for analytical reasoning, poor for writing mechanics and effectiveness; producing a moderate Performance Task Score and lowering the overall total score.
+
+
+# The Critical Thinking Assessment Test (CAT Test)[^cat]
+
+The Critical Thinking Assessment Test (CAT) is a 60 minute, paper test that was collaboratively developed by Tennessee Technological University (TTU) and faculty from participating institutions. The primary goal of this collaboration was to develop a faculty-driven assessment tool to engage the faculty in meaningful, authentic assessment with the goal of improving student learning. The CAT assesses a consensus core set of five skills that address elements of critical thinking, problem solving, and communication across a variety of disciplines. 
+
+The CAT consists of 15 questions requiring both quick response items (multiple choice, binary scale) and short answer essay responses that are likely to measure both the cognitive elements of critical thinking as well as the disposition of students to actually engage in critical thinking. 
+
+## Interpreting CAT Scores
+The CAT test is collaboratively scored by a group of trained raters, with the creators of the test endorsing a 'train-the-trainer' system following a detailed scoring guide.  While the creators of the test encourage faculty-led scoring sessions, to help faculty better understand the strenghts and weakeness of their students, all scoring sesssions at Queen's were conducted by expertly trained upper-year students.
+
+The CAT scores are provided on a criterion referenced absolute scale
+
+
+## Margin Figures
+
+Images and graphics play an integral role in Tufte's work. To place figures or tables in the margin you can use the `fig.margin` knitr chunk option. For example:
+
+```{r, fig.margin = TRUE, fig.cap = "Sepal length vs. petal length, colored by species"}
+library(ggplot2)
+qplot(Sepal.Length, Petal.Length, data = iris, color = Species)
+```
+
+Note the use of the `fig.cap` chunk option to provide a figure caption. You can adjust the proportions of figures using the `fig.width` and `fig.height` chunk options. These are specified in inches, and will be automatically scaled down to fit within the handout margin.
+
+## Equations
+
+You can also include \LaTeX\ equations in the margin by explicitly invoking the `marginfigure` environment.
+
+\begin{marginfigure}
+$$\frac{d}{dx}\left( \int_{0}^{x} f(u)\,du\right)=f(x).$$
+\caption{An equation}
+\end{marginfigure}
+
+Note the use of the `\caption` command to add additional text below the equation.
+
+## Full Width Figures
+
+You can arrange for figures to span across the entire page by using the `fig.fullwidth` chunk option. 
+
+```{r, fig.width = 10, fig.height = 2, fig.fullwidth = TRUE, fig.cap = "Full width figure"}
+qplot(wt, mpg, data=mtcars, colour=factor(cyl))
+```
+
+Note the use of the `fig.width` and `fig.height` chunk options to establish the proportions of the figure. Full width figures look much better if their height is minimized.
+
+## Main Column Figures
+
+Besides margin and full width figures, you can of course also include figures constrained to the main column.
+
+```{r, fig.cap = "Another figure"}
+qplot(factor(cyl), mpg, data = mtcars, geom = "boxplot")
+```
+
+# Sidenotes
+
+One of the most prominent and distinctive features of this style is the extensive use of sidenotes. There is a wide margin to provide ample room for sidenotes and small figures. Any use of a footnote will automatically be converted to a sidenote. ^[This is a sidenote that was entered using a footnote.] 
+
+If you'd like to place ancillary information in the margin without the sidenote mark (the superscript number), you can use the `\marginnote` command. \marginnote{This is a margin note.  Notice that there isn't a number preceding the note.}
+
+Note also that the two footnote references (`tufte_latex` and `books_be`, both defined below) were also included in the margin on the first page of this document.
+
+# Tables
+
+You can use the **xtable** package to format \LaTeX\ tables that integrate well with the rest of the Tufte handout style. Note that it's important to set the `xtable.comment` and `xtable.booktabs` options as shown below to ensure the table is formatted correctly for inclusion in the document.
+
+```{r, results='asis'}
+library(xtable)
+options(xtable.comment = FALSE)
+options(xtable.booktabs = TRUE)
+xtable(head(mtcars[,1:6]), caption = "First rows of mtcars")
+```
+
+
+
+[^heqco]: http://www.heqco.ca
+[^qlop]: http://www.queensu.ca/qloa/home
+[^tools]: http://www.queensu.ca/qloa/assessment-tools
+[^cla+]: http://cae.org/
+[^cat]: http://www.tntech.edu/cat
+[^value]: http://www.aacu.org/value/rubrics
+[^tlo]: http://www.queensu.ca/qloa/assessment-tools/transferable-learning-orientations-tlo-survey
+[^mastery]: http://cae.org/images/uploads/pdf/cla_ss.pdf
+
+
+
+
+
+
+
+

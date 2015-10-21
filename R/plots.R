@@ -77,6 +77,39 @@ box<-data %>%
 grid.arrange(dot,box,ncol=2)
 
 
+devtools::source_gist("524eade46135f6348140")
+
+CLA %>% 
+  filter(!is.na(time_pt), !is.na(effort_pt), !is.na(pt_aps), class!=4) %>% 
+  mutate(time_pt = as.numeric(time_pt),
+         color = ifelse(pt_aps>4, "#1047EC", "grey50"),
+         alpha = ifelse(pt_aps>4, 1, 0.5),
+         study_year = ifelse(year==2013,1,2)) %>% 
+  ggplot(.,aes(x=time_pt, y=effort_pt)) + 
+  geom_point(aes(alpha=alpha, fill=color), pch=21, colour="black", position = position_jitter()) +
+#   stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE) +
+#   geom_smooth(method='lm',formula=y~x, se=FALSE) +
+  facet_wrap(~study_year) +
+  theme(
+    text = element_text(family = "Gill Sans MT", size = 22),
+    panel.grid.major.y = element_line(colour = "grey50", size = 0.05),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.border = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    legend.position = "none",
+    strip.text.y = element_text(size = 18, angle = 0),
+    strip.text.x = element_text(size = 18),
+    axis.text.x = element_text(size = 18, color = "black"),
+    axis.text.y = element_text(size = 18,color = "black"),
+    panel.background = element_rect(fill = "#FFFFFF"),
+    strip.background = element_rect(fill = "#FFFFFF"),
+    plot.background = element_rect(fill = "#FFFFFF")) +
+  scale_fill_identity() +
+  scale_alpha_identity()
+
+
 #   cla.pt <- m.df %>% 
 #   {
 #     mutate(.,project_year = as.numeric(project_year)) %>% 

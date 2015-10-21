@@ -5,51 +5,56 @@ library(dplyr)
 library(stringr)
 library(rio)
 library(tidyr)
+library(ggplot2)
+library(corrplot)
 
+nsse <- dbConnect(MySQL(), group='QUIVER')
+
+con <- dbConnect(MySQL(), group='LOAC')
 TLO <- dbReadTable(con,"TLO")
 student_info <- dbReadTable(con,"student_info")
-cla_plus <- dbReadTable(con,"cla_plus")
-
-data.dir<-"/Users/Jake/ownCloud/Engineering Education Research/HEQCO/LOAC Project/VALUE/"
-
-fy.value <- paste0(data.dir,"LOAC 1 VALUE.xlsx") %>% 
-  import(sheet="Master") %>% 
-  rename(studentid = Student_ID)
-
-artifacts <- paste0(data.dir,"LOAC 1 VALUE.xlsx") %>% 
-  import(sheet="Artifacts")
-
-fy.r1 <- fy.value %>% 
-  select(studentid,course,contains("R1_")) %>% 
-  set_colnames(str_replace(colnames(.),"R\\d_","")) %>% 
-  gather("dimension","level",-studentid:-course) 
-
-fy.r1$rater <- 1
-
-fy.r1$rubric <- str_sub(fy.r1$dimension,1,2)
+CLA <- dbReadTable(con,"cla_plus")
+VALUE <- dbReadTable(con,"VALUE")
+CAT <- dbReadTable(con,"cat")
+NSSE <- dbReadTable(nsse, 'NSSE') %>% 
+  rename(studentid = STUDENT_ID)
 
 
-
-# fy.r1$dimension %<>% str_extract("\\d")
-
-
-fy.r2 <- fy.value %>% 
-  select(studentid,course,contains("R2_")) %>% 
-  set_colnames(str_replace(colnames(.),"R\\d_","")) %>% 
-  gather("dimension","level",-studentid:-course) 
-
-fy.r2$rater <- 2
-
-fy.r2$rubric <- str_sub(fy.r2$dimension,1,2)
-
-m.fy.value <- bind_rows(fy.r1,fy.r2) %>% 
-  na.omit
-
-m.fy.value$artifact <- artifacts$artifact[match(m.fy.value$course,artifacts$course)]
-
-m.fy.value$change <- NA
-
-m.fy.value %<>%
-  select(studentid,course,artifact,rater,rubric,dimension,level,change)
-
+apsc.CAT <- student_info %>% 
+  filter(subject=="APSC", course==101)  %>% 
+  filter(test=="CAT") %>% 
+  left_join(CAT, by=c("studentid","subject","course")) %>% 
+  filter(!is.na(score)) %>% 
+  select(studentid,subject,course,score) %>% 
+  inner_join(NSSE) %>% 
+  write.csv("APSC 100 CAT-NSSE.csv")
   
+apsc.CLA <- student_info %>% 
+  filter(subject=="APSC", course==101)  %>% 
+  filter(test=="CLA+") %>% 
+  left_join(CLA, by=c("studentid","year")) %>% 
+  select(-sex.y, -email.y) %>% 
+  rename(sex = sex.x,
+         email = email.x) %>% 
+  select(studentid,year,mastery,time_pt:time_sr,pt_aps:score_total,effort_pt:engaging_sr) %>% 
+  inner_join(NSSE) %>% 
+  write.csv("APSC 100 CLA-NSSE.csv")
+ 
+
+
+
+apsc.VALUE <- student_info %>% 
+  filter(subject=="APSC", course==101)  %>% 
+  left_join(VALUE, by=c("studentid","subject","course")) %>% 
+  filter(!is.na(artifact)) %>% 
+  filter(level != 99) %>% 
+  select(-program.y) %>% 
+  rename(program = program.x) %>% 
+  group_by(studentid,subject,course,dimension) %>% 
+  summarize(level=trunc(mean(level))) %>% 
+  spread(dimension,level)  %>% 
+  inner_join(NSSE) %>% 
+  write.csv("APSC 100 VALUE-NSSE.csv")
+ 
+
+

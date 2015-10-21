@@ -1,5 +1,3 @@
-library(DBI)
-library(RMySQL)
 library(magrittr)
 library(dplyr)
 library(stringr)
@@ -7,11 +5,10 @@ library(rio)
 library(tidyr)
 
 # Connections and Directories ----
-# Connection to LOAC Database 
-con <- dbConnect(MySQL(), group='LOAC')
+source("Student Wrangling.R")
 
 # Read in Student Info Table
-student_info <- dbReadTable(con,"student_info")
+student_info <- master
 
 
 # Directory for VALUE Rubric Data

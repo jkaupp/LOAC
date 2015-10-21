@@ -18,64 +18,118 @@ cla_plus <- dbReadTable(con,"cla_plus")
 cat <- dbReadTable(con,"cat")
 value <- dbReadTable(con,"VALUE")
 
-# Create first year eng data frame----
-fy.eng <- student_info %>% 
-  filter(semester==1, subject=="APSC") %>% 
-  rename(`first year discipline`= plan)
+fy.loac <- student_info %>% 
+  filter(semester==1, course!=103) %>% 
+  rename(`first year discipline` = plan) %>% 
+  distinct(studentid)
 
-# Create second year eng data frame
-sy.eng <- student_info %>% 
-  filter(subject=="APSC" | subject=="ENPH", course==200 | course==239) %>% 
-  rename(`second year discipline`= plan)
+sy.loac <- student_info %>% 
+  filter(semester==3 | semester==4, subject != "ENPH") %>% 
+  rename(`second year discipline` = plan)
 
-# Merge the data frames by student id, and filter to get to consistent test takers.
-f2.loac <- left_join(fy.eng, sy.eng, by="studentid") %>% 
+
+full.loac <- inner_join(fy.loac, sy.loac, by="studentid") %>% 
   filter(!is.na(consent.y)|!is.na(consent.x)) %>% 
-  select(studentid, name.y, `second year discipline`, subject.x, course.x, test.x, subject.y, course.y, test.y, year.x, year.y) %>% 
+  select(studentid, name.y, `second year discipline`, subject.x, course.x, test.x, subject.y, course.y, test.y, year.x, year.y, consent.x, consent.y) %>% 
   unite(fy.course, c(subject.x, course.x), sep = " ") %>% 
   unite(sy.course, c(subject.y, course.y), sep = " ") %>% 
   rename(name = name.y,
          discipline =  `second year discipline`,
          fy = test.x,
-         sy = test.y) %>% 
-  filter(fy==sy) %>%
-  unite(`1`, c(fy.course, fy, year.x), sep = "-") %>% 
-  unite(`2`, c(sy.course, sy, year.y), sep = "-") %>% 
-  gather(project_year, test,c(`1`,`2`)) %>% 
-  separate(test,c("course", "test", "year"),sep = "-") %>% 
+         sy = test.y,
+         fy.consent = consent.x,
+         sy.consent = consent.y) %>% 
+  unite(`1`, c(fy.course, fy, year.x, fy.consent), sep = "-") %>% 
+  unite(`2`, c(sy.course, sy, year.y, sy.consent), sep = "-") %>% 
+  gather(project_year, test, c(`1`,`2`)) %>% 
+  separate(test,c("course", "test", "year", "consent"),sep = "-") %>% 
   separate(course,c("subject", "course"), sep = " ")
 
-f2.loac$course %<>%
+full.loac$course %<>%
   as.numeric
 
-f2.loac$year %<>%
+full.loac$year %<>%
   as.numeric
+
 
 # Merge consitent test taker frame, subset by CAT, join with CAT data, filter by consenting student, and filter out non-duplicate records----
-CAT <- f2.loac %>% 
+CAT <- full.loac %>% 
   filter(test=="CAT") %>% 
   left_join(cat, by=c("studentid","subject","course")) %>% 
-  semi_join(student_info %>% 
-              filter(consent>=2), 
-            by= c("studentid","subject","course")) %>% 
+#   semi_join(student_info %>% 
+#               filter(consent>=2), 
+#             by= c("studentid","subject","course")) %>% 
   filter(!is.na(score)) %>% 
   group_by(studentid) %>% 
-  filter(n()>1)
+  filter(n()>1) %>% 
+  write.csv("LOAC CAT Paired.csv")
 
 # Merge consitent test taker frame, subset by CLA, join with CAT data, filter by consenting student, and filter out non-duplicate records----
-CLA <- f2.loac %>% 
+CLA <- full.loac %>% 
   filter(test=="CLA+") %>% 
   left_join(cla_plus, by=c("studentid","year")) %>% 
-  semi_join(student_info %>% 
-              filter(consent>=2), 
-            by=c("studentid","year")) %>% 
+#   semi_join(student_info %>% 
+#               filter(consent>=2), 
+#             by=c("studentid","year")) %>% 
   filter(!is.na(score_pt)) %>% 
   group_by(studentid) %>% 
-  filter(n()>1)
+  filter(n()>1) %>% 
+  write.csv("LOAC CLA Paired.csv")
+
+
+
+# VALUE Data Prep----
+# Create first year eng data frame for VALUE 
+fy.value <- student_info %>% 
+  filter(semester==2 | semester==1, course!="101") %>% 
+  rename(`first year discipline`= plan) %>% 
+  inner_join(value,., by=c("studentid","subject","course")) %>% 
+  filter(level!=99) %>% 
+  unite(dimension1, rubric, dimension) %>% 
+  rename(dimension = dimension1) %>% 
+  group_by(studentid, consent, subject, course, dimension) %>% 
+  summarize(level=trunc(mean(level))) %>% 
+  spread(dimension,level) %>% 
+  mutate(program_year=1) %>% 
+  select(studentid, program_year, subject, course, consent, everything())
+  
+  
+
+# Create second year eng data frame
+sy.value <- student_info %>% 
+  filter(semester==3 | semester==4, subject!="ENPH") %>% 
+  rename(`second year discipline`= plan) %>% 
+  inner_join(value,., by=c("studentid","subject","course")) %>% 
+  filter(level!=99) %>% 
+  unite(dimension1, rubric, dimension) %>% 
+  rename(dimension = dimension1) %>% 
+  mutate(program_year=1) %>% 
+  group_by(studentid, consent, subject, course, dimension) %>% 
+  summarize(level=trunc(mean(level))) %>% 
+  spread(dimension,level) %>% 
+  mutate(program_year=2) %>% 
+  select(studentid, program_year, subject, course, consent, everything())
+
+
+VALUE <- bind_rows(fy.value[fy.value$studentid %in% sy.value$studentid,],sy.value[sy.value$studentid %in% fy.value$studentid,]) %>% 
+  write.csv("LOAC VALUE.csv")
+
+bind_rows(fy.value,sy.value) %>% 
+  write.csv("LOAC VALUE Unpaired.csv")
+
+
+
+
+
+
+
+VALUE$level %<>%
+  factor(names(
+  table(.)), c("Below Benchmark 1", "Benchmark 1", "Milestone 2", "Milestone 3", "Capstone 4", "Not Assessed"))
 
 # CLA Plots ----
 cla.pt <- . %>% {
-    mutate(.,project_year = as.numeric(project_year)) %>% 
+  mutate(.,project_year = as.numeric(project_year)) %>% 
     filter(time_pt>5 | effort_pt>2) %>% 
     ggplot(aes(x = project_year, y = score_pt)) +
     geom_line(aes(group = studentid), alpha = 0.1) +
@@ -133,48 +187,7 @@ CAT %>% {
       plot.background = element_rect(fill = "#FFFFF3")
     ) 
 } %>% 
-ggsave("CAT Panel.png",  plot = ., scale = 1, width = 16, height = 14)
-
-# VALUE Data Prep----
-# Create first year eng data frame for VALUE 
-fy.eng.value <- student_info %>% 
-  filter(semester==2, subject=="APSC", course=="103") %>% 
-  rename(`first year discipline`= plan)
-
-# Create second year eng data frame
-sy.eng.value <- student_info %>% 
-  filter(subject=="APSC" | subject=="ENPH", course==200 | course==239) %>% 
-  rename(`second year discipline`= plan)
-
-value.loac <- left_join(fy.eng.value, sy.eng.value, by="studentid") %>% 
-  filter(!is.na(consent.y)|!is.na(consent.x)) %>% 
-  select(studentid, name.y, `second year discipline`, subject.x, course.x, test.x, subject.y, course.y, test.y, year.x, year.y) %>% 
-  unite(fy.course, c(subject.x, course.x), sep = " ") %>% 
-  unite(sy.course, c(subject.y, course.y), sep = " ") %>% 
-  rename(name = name.y,
-         discipline =  `second year discipline`,
-         fy = test.x,
-         sy = test.y) %>% 
-  unite(`1`, c(fy.course, fy, year.x), sep = "-") %>% 
-  unite(`2`, c(sy.course, sy, year.y), sep = "-") %>% 
-  gather(project_year, test,c(`1`,`2`)) %>% 
-  separate(test,c("course", "test", "year"),sep = "-") %>% 
-  separate(course,c("subject", "course"), sep = " ")
-
-VALUE <- value %>% 
-  filter(subject=="APSC", course!=480, course!=101) %>% 
-  left_join(.,value.loac, by=c("studentid","subject","course")) %>% 
-#   semi_join(student_info %>% 
-#               filter(consent>=2), 
-#             by= c("studentid","subject","course")) %>% 
-  group_by(studentid,rubric,dimension) %>% 
-  filter(n()>1) %>% 
-  filter(!is.na(project_year))
-
-
-VALUE$level %<>%
-  factor(names(
-  table(.)), c("Below Benchmark 1", "Benchmark 1", "Milestone 2", "Milestone 3", "Capstone 4", "Not Assessed"))
+  ggsave("CAT Panel.png",  plot = ., scale = 1, width = 16, height = 14)
 
 #VALUE Plots----
 VALUE %>%
