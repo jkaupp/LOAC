@@ -15,3 +15,5 @@ packrat/src/
 *.xls
 
 *.pdf
+
+R/MSSQL Updates.R
