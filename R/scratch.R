@@ -1,5 +1,5 @@
 library(DBI)
-library(RMySQL)
+library(RODBC)
 library(magrittr)
 library(dplyr)
 library(stringr)
@@ -8,53 +8,43 @@ library(tidyr)
 library(ggplot2)
 library(corrplot)
 
-nsse <- dbConnect(MySQL(), group='QUIVER')
 
-con <- dbConnect(MySQL(), group='LOAC')
-TLO <- dbReadTable(con,"TLO")
-student_info <- dbReadTable(con,"student_info")
-CLA <- dbReadTable(con,"cla_plus")
-VALUE <- dbReadTable(con,"VALUE")
-CAT <- dbReadTable(con,"cat")
-NSSE <- dbReadTable(nsse, 'NSSE') %>% 
-  rename(studentid = STUDENT_ID)
+con <- odbcConnect("FEAS-HEQCO", uid="AD\\kauppj", pwd="Laurenque5pge!")
+
+student_info <- sqlFetch(con, "student_info")
+cla <-sqlFetch(con, "cla_plus")
+tlo <-sqlFetch(con, "tlo")
+value <-sqlFetch(con, "value")
+cat <- sqlFetch(con, "cat")
 
 
-apsc.CAT <- student_info %>% 
-  filter(subject=="APSC", course==101)  %>% 
-  filter(test=="CAT") %>% 
-  left_join(CAT, by=c("studentid","subject","course")) %>% 
-  filter(!is.na(score)) %>% 
-  select(studentid,subject,course,score) %>% 
-  inner_join(NSSE) %>% 
-  write.csv("APSC 100 CAT-NSSE.csv")
-  
-apsc.CLA <- student_info %>% 
-  filter(subject=="APSC", course==101)  %>% 
-  filter(test=="CLA+") %>% 
-  left_join(CLA, by=c("studentid","year")) %>% 
-  select(-sex.y, -email.y) %>% 
-  rename(sex = sex.x,
-         email = email.x) %>% 
-  select(studentid,year,mastery,time_pt:time_sr,pt_aps:score_total,effort_pt:engaging_sr) %>% 
-  inner_join(NSSE) %>% 
-  write.csv("APSC 100 CLA-NSSE.csv")
- 
+student_info %>% 
+  mutate(project_year = ifelse(semester %in% c(1,2), 1, ifelse(semester %in% c(3,4), 2, 4))) %>% 
+  mutate(consent = ifelse(consent == 1,"Non-consenting", "Consenting")) %>% 
+  crosstab(., row.vars = c("project_year","consent"), col.vars = "subject", type = c("f", "c"), addmargins = FALSE) 
 
+student_info %>% 
+  mutate(project_year = ifelse(semester %in% c(1,2), 1, ifelse(semester %in% c(3,4), 2, 4))) %>% 
+  mutate(consent = ifelse(consent == 1,"Non-consenting", "Consenting")) %>% 
+  crosstab(., row.vars = c("consent"), col.vars = "project_year", type = c("f", "c"), addmargins = FALSE)
 
+render_loac_report <- function(dept,title) 
+{
+  rmarkdown::render(
+    "./R/LOAC Dept Report.Rmd", output_dir = "./reports/", output_file = paste(dept, "LOAC", "Report.pdf", sep = "_"),
+    params = list(dept = dept,
+                  dept_title = title
+    )
+)
+}
 
-apsc.VALUE <- student_info %>% 
-  filter(subject=="APSC", course==101)  %>% 
-  left_join(VALUE, by=c("studentid","subject","course")) %>% 
-  filter(!is.na(artifact)) %>% 
-  filter(level != 99) %>% 
-  select(-program.y) %>% 
-  rename(program = program.x) %>% 
-  group_by(studentid,subject,course,dimension) %>% 
-  summarize(level=trunc(mean(level))) %>% 
-  spread(dimension,level)  %>% 
-  inner_join(NSSE) %>% 
-  write.csv("APSC 100 VALUE-NSSE.csv")
- 
+render_loac_report("MECH","Department of Mechanical and Materials Engineering")
+render_loac_report("ECE","Department of Electrical and Computer Engineering")
+render_loac_report("PSYC","Department of Pyschology")
 
+report_list <- data_frame(dept = c("MECH","ECE","PSYC"),
+                          title = c("Department of Mechanical and Materials Engineering",
+                                    "Department of Electrical and Computer Engineering",
+                                    "Department of Psychology"))
 
+sapply(report_list, render_loac_report, title = report_list$title)
