@@ -72,8 +72,7 @@ CAT <- full.loac %>%
   rename(name = name.x,
          year = year.x,
          consent = consent.x) 
-# %>% 
-#   mutate(discipline = ifelse(is.na(discipline), subject, discipline))
+
   
 
 # Merge consitent test taker frame, subset by CLA, join with CLA data, filter by consenting student, and filter out non-duplicate records----
@@ -121,7 +120,7 @@ sy.value <- student_info %>%
 
 #Entire VALUE Data frame
 
-full.VALUE <- bind_rows(fy.value,sy.value) %>% 
+VALUE <- bind_rows(fy.value,sy.value) %>% 
   left_join(sy.loac %>% select(studentid,`second year discipline`), by=c("studentid")) %>% 
   rename(discipline = `second year discipline.y`) %>% 
   select(-`second year discipline.x`) %>% 
@@ -129,16 +128,20 @@ full.VALUE <- bind_rows(fy.value,sy.value) %>%
   separate(.,rubric1,c("rubric","dimension"), sep="_") %>% 
   mutate(level = ifelse(is.na(level),99,level))
 
+#intersect(subset(full.VALUE, project_year == 1, select=studentid), subset(full.VALUE, project_year == 2, select=studentid))
+
+# CLA %>% 
+#   intersect(subset(CLA, project_year == 1, select=studentid), subset(CLA, project_year == 2 & subject == "PSYC", select=studentid))
 
 # Sequenetial VALUE data frame
-VALUE <- bind_rows(fy.value[fy.value$studentid %in% sy.value$studentid,],sy.value[sy.value$studentid %in% fy.value$studentid,]) %>% 
-  left_join(sy.loac %>% select(studentid,`second year discipline`), by=c("studentid")) %>% 
-  rename(discipline = `second year discipline.y`) %>% 
-  select(-`second year discipline.x`, -`first year discipline`) %>%
-  gather(.,rubric1,level, 9:ncol(.), -discipline) %>% 
-  separate(.,rubric1,c("rubric","dimension"), sep="_") %>% 
-  mutate(level = ifelse(is.na(level),99,level))
-        
+# VALUE <- bind_rows(fy.value[fy.value$studentid %in% sy.value$studentid,],sy.value[sy.value$studentid %in% fy.value$studentid,]) %>% 
+#   left_join(sy.loac %>% select(studentid,`second year discipline`), by=c("studentid")) %>% 
+#   rename(discipline = `second year discipline.y`) %>% 
+#   select(-`second year discipline.x`, -`first year discipline`) %>%
+#   gather(.,rubric1,level, 9:ncol(.), -discipline) %>% 
+#   separate(.,rubric1,c("rubric","dimension"), sep="_") %>% 
+#   mutate(level = ifelse(is.na(level),99,level))
+#         
 
 
 TLO <- full.loac %>% 

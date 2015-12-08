@@ -111,11 +111,23 @@ library(dplyr)
 library(ggplot2)
 library(ggthemes)
 
- CLA %>%
-  group_by(studentid) %>% 
-   filter(discipline %in% p.select,!is.na(score_total)) %>%
+if(params$dept == "PSYC")
+{
+data <- CLA %>%
+  group_by(studentid) %>%
+   filter(subject == params$dept, !is.na(score_total)) %>% 
    mutate(project_year = as.numeric(project_year)) %>% 
-   arrange(desc(project_year,score_total)) %>%
+   arrange(desc(project_year,score_total)) 
+} else {
+data <- CLA %>%
+  group_by(studentid) %>% 
+   filter(discipline %in% p.select,!is.na(score_total)) %>% 
+   mutate(project_year = as.numeric(project_year)) %>% 
+   arrange(desc(project_year,score_total)) 
+}
+
+
+data %>%   
    ggplot(aes(x = project_year, y = score_total)) +
    geom_line(aes(group = studentid), alpha = 0.2) +
    stat_summary(
@@ -141,14 +153,22 @@ Alternatively, the results can also be viewed by looking at the distribution of 
 ```{r CLA_Mastery, fig.width = 10, fig.height = 5, fig.cap = "CLA+ Mastery Score Distribution",  fig.fullwidth = TRUE}
 suppressPackageStartupMessages(library(gdata, stringr))
 
-
+if(params$dept == "PSYC")
+{
+data <-CLA %>%
+  group_by(studentid) %>%
+   filter(subject == params$dept, !is.na(mastery)) %>% 
+   filter(n()>1) %>% 
+   mutate(project_year = factor(project_year,c(1,2), c("2013-2014","2014-2015")),
+             mastery = reorder.factor(mastery,new.order=c("Below Basic","Basic","Proficient","Advanced")))
+} else {
 data <- CLA %>%
-   filter(discipline %in% p.select, !is.na(mastery)) %>% 
+  filter(discipline %in% p.select, !is.na(mastery)) %>% 
    group_by(studentid) %>% 
    filter(n()>1) %>% 
    mutate(project_year = factor(project_year,c(1,2), c("2013-2014","2014-2015")),
              mastery = reorder.factor(mastery,new.order=c("Below Basic","Basic","Proficient","Advanced")))
-
+}
 
 max <- data %>% 
   group_by(project_year, mastery) %>% 
@@ -178,16 +198,31 @@ There are variety of factors that influence student performance on the CLA+.  Th
 \newpage
 
 ```{r Correlations, fig.width = 12, fig.height = 8,fig.cap = "Effort, Time and Score Correlations"}
-cor1 <- CLA %>%
-  filter(discipline %in% p.select) %>%
+
+if(params$dept == "PSYC")
+{
+data <-CLA %>%
+   filter(subject == params$dept) %>% 
+   group_by(studentid) %>% 
+   filter(n()>1) %>% 
+   ungroup
+} else {
+data <- CLA %>%
+  filter(discipline %in% p.select) %>% 
+  group_by(studentid) %>% 
+   filter(n()>1) %>% 
+   ungroup
+}
+
+
+cor1 <- data %>% 
   filter(project_year == 1) %>% 
   select(score_total, score_pt, score_sr, effort_pt, effort_sr, time_pt, time_sr) %>%
   cor() %>% 
   reshape2::melt() %>% 
   mutate(project_year ="2013-2014")
 
-cor2 <-  CLA %>%
-  filter(discipline %in% p.select) %>%
+cor2 <- data %>% 
   filter(project_year == 2) %>% 
   select(score_total, score_pt, score_sr, effort_pt, effort_sr, time_pt, time_sr) %>%
   cor() %>% 
@@ -212,14 +247,32 @@ The CLA+ does address this by measuring effort and time on task, which allows fo
 
 ```{r effort, fig.cap = "Self-reported Effort on Task", fig.width = 10, fig.height = 6}
 
-data <- CLA %>%
-  filter(discipline %in% p.select) %>% 
-  mutate(project_year = factor(project_year,c(1,2), c("2013-2014","2014-2015"))) %>% 
-  select(discipline, project_year,effort_pt,effort_sr) %>%
-  rename(`Performance Task Effort` = effort_pt,
-         `Selected Response Effort` = effort_sr) %>% 
-  gather(Task,Value, -project_year, -discipline) %>% 
-  filter(!is.na(Value))
+if(params$dept == "PSYC")
+{
+  data <- CLA %>%
+    filter(subject == params$dept) %>%
+    group_by(studentid) %>% 
+    filter(n()>1) %>% 
+    ungroup %>% 
+    mutate(project_year = factor(project_year,c(1,2), c("2013-2014","2014-2015"))) %>%
+    select(discipline, project_year,effort_pt,effort_sr) %>%
+    rename(`Performance Task Effort` = effort_pt,
+    `Selected Response Effort` = effort_sr) %>%
+    gather(Task,Value,-project_year,-discipline) %>%
+    filter(!is.na(Value))
+} else {
+  data <- CLA %>%
+    filter(discipline %in% p.select) %>%
+    group_by(studentid) %>%
+    filter(n() > 1) %>%
+    ungroup %>% 
+    mutate(project_year = factor(project_year,c(1,2), c("2013-2014","2014-2015"))) %>%
+    select(discipline, project_year,effort_pt,effort_sr) %>%
+    rename(`Performance Task Effort` = effort_pt,
+    `Selected Response Effort` = effort_sr) %>%
+    gather(Task,Value,-project_year,-discipline) %>%
+    filter(!is.na(Value))
+}
 
 
 max <- data %>%
@@ -240,11 +293,30 @@ ggplot(data, aes(x = factor(Value))) +
 ```
 
 ```{r time,fig.cap = "Time on Task", fig.width = 10, fig.height = 6}
-CLA %>%
-  filter(discipline %in% p.select) %>% 
-  mutate(project_year = factor(project_year,c(1,2), c("2013-2014","2014-2015"))) %>% 
+
+if(params$dept == "PSYC")
+{
+  data <- CLA %>%
+    filter(subject == params$dept) %>%
+    group_by(studentid) %>% 
+    filter(n()>1) %>% 
+    ungroup %>% 
+    mutate(project_year = factor(project_year,c(1,2), c("2013-2014","2014-2015"))) %>% 
   select(discipline, project_year,time_pt,time_sr) %>%
-  gather(Task, Time, -project_year, -discipline) %>% 
+  gather(Task, Time, -project_year, -discipline) 
+} else {
+  data <- CLA %>%
+    filter(discipline %in% p.select) %>%
+    group_by(studentid) %>%
+    filter(n() > 1) %>%
+    ungroup %>% 
+    mutate(project_year = factor(project_year,c(1,2), c("2013-2014","2014-2015"))) %>% 
+  select(discipline, project_year,time_pt,time_sr) %>%
+  gather(Task, Time, -project_year, -discipline) 
+}
+
+
+data %>% 
   ggplot(aes(x = Time)) +
   geom_density(aes(fill = Task), position = position_dodge(), alpha=0.5) +
   xlab("\nTime on Task") +
@@ -261,7 +333,23 @@ CLA %>%
 The total score is comprised of the scores from the two tasks: the performance task and the selected response questions.  The scores from each represent how well students perform on each task, presented on an absoulte scale, similar to the total score of the CLA+.  The results are presented below as a line graph to illustrate increases or decreases over time.  The blue line and numbers illustrate the mean score.
 ```{r PT_SR_Scores, fig.width = 16, fig.height = 7,  fig.cap = paste0(params$dept_title, ": CLA+ PT and SR Scores"),  fig.fullwidth = TRUE}
 
-data <- CLA %>%
+if(params$dept == "PSYC")
+{
+  data <- CLA %>%
+   group_by(studentid) %>% 
+   filter(subject == params$dept, !is.na(score_total)) %>%
+   mutate(project_year = as.numeric(project_year)) %>% 
+   select(studentid, project_year, score_pt, score_sr) %>% 
+   rename("Selected Response Score" = score_sr,
+          "Performance Task Score" = score_pt) %>% 
+   filter(n()>1) %>% 
+   ungroup %>% 
+   gather(task, score, `Performance Task Score`, `Selected Response Score`) %>% 
+   spread(project_year,score) %>% 
+   rename(score_y1 = `1`,
+          score_y2 = `2`)
+} else {
+  data <- CLA %>%
    group_by(studentid) %>% 
    filter(discipline %in% p.select,!is.na(score_total)) %>%
    mutate(project_year = as.numeric(project_year)) %>% 
@@ -274,14 +362,15 @@ data <- CLA %>%
    spread(project_year,score) %>% 
    rename(score_y1 = `1`,
           score_y2 = `2`)
-  
+}
 
 summary.data <- data %>% 
   group_by(task) %>% 
   summarize_each(funs(mean), -studentid, -task)  %>% 
   mutate_each(funs(floor), -task)
 
-  ggplot(data) +
+data %>% 
+  ggplot() +
   geom_segment(aes(group = studentid, x = 1.02, xend = 1.98, y = score_y1, yend = score_y2), alpha = 0.2) +
   geom_segment(aes(x = 1.02, xend = 1.98,  y = score_y1, yend = score_y2), size = 1, color = "blue", summary.data) +
   geom_text(aes(label = score_y1, x = 1, y = score_y1), color = "blue", fontface = "bold", summary.data) +
@@ -312,8 +401,26 @@ The results are presented below as horizontal histograms, allowing the compariso
 
 ```{r PT_Subscores, fig.width = 10, fig.height = 6,  fig.cap = paste0(params$dept_title, ": CLA+ PT Sub-scale Scores"),  fig.fullwidth = TRUE}
 
-data <- CLA %>%
+if(params$dept == "PSYC")
+{
+  data <- CLA %>%
+   group_by(studentid) %>% 
+   filter(subject == params$dept, !is.na(score_total)) %>%
+   filter(n()>1) %>% 
+   ungroup %>% 
+  mutate(project_year = factor(project_year,c(1,2), c("2013-2014","2014-2015"))) %>%
+   rename(
+   "Analytical Reasoning & Problem Solving" = pt_aps,
+   "Writing Mechanics" = pt_wm,
+   "Writing Effectiveness" = pt_we
+   ) %>%
+    gather(task, score, `Analytical Reasoning & Problem Solving`, `Writing Mechanics`, `Writing Effectiveness`) 
+} else {
+  data <- CLA %>%
+   group_by(studentid) %>% 
    filter(discipline %in% p.select,!is.na(score_total)) %>%
+   filter(n()>1) %>% 
+   ungroup %>% 
    mutate(project_year = factor(project_year,c(1,2), c("2013-2014","2014-2015"))) %>%
    rename(
    "Analytical Reasoning & Problem Solving" = pt_aps,
@@ -321,12 +428,14 @@ data <- CLA %>%
    "Writing Effectiveness" = pt_we
    ) %>%
     gather(task, score, `Analytical Reasoning & Problem Solving`, `Writing Mechanics`, `Writing Effectiveness`) 
+}
 
   
 max <- data %>%
   group_by(project_year, task, score) %>% tally %>% ungroup %>% select(n) %>% max() 
       
-ggplot(data,aes(x = score)) +
+data %>% 
+ggplot(aes(x = score)) +
    geom_bar(aes(fill = task), position = position_dodge(), binwidth = 0.5) +
    coord_flip() +
    xlab("Rubric Level\n") +
@@ -351,31 +460,60 @@ While the Selected Response Questions assesses, using an criterion referenced ab
 The results are presented below as a line graph to illustrate increases or decreases over time.  The blue line and numbers illustrates the mean score.
 ```{r SR_Subscores, fig.width = 12, fig.height = 6,  fig.cap = paste0(params$dept_title, ": CLA+ SR Sub-scale Scores"),  fig.fullwidth = TRUE}
 
-data <- CLA %>%
-  filter(discipline %in% p.select,!is.na(sr_sqr),!is.na(sr_ca),!is.na(sr_cre)) %>%
+if(params$dept == "PSYC")
+{
+  data <- CLA %>%
+   group_by(studentid) %>% 
+   filter(subject == params$dept, !is.na(sr_sqr),!is.na(sr_ca),!is.na(sr_cre)) %>%
+   filter(n()>1) %>% 
+   ungroup %>% 
   mutate(project_year = as.numeric(project_year)) %>%
-  select(studentid, project_year, sr_sqr, sr_ca, sr_cre) %>% 
-  group_by(studentid) %>% 
-  filter(n()>1) %>% 
-  ungroup %>% 
-  rename(
-   "Scientific & Quantitative Reasoning" = sr_sqr,
-   "Critique an Argument" = sr_ca,
-   "Critical Reading & Evaluation" = sr_cre
-   ) %>%
-   gather(
-   task, score, `Scientific & Quantitative Reasoning`, `Critique an Argument`, `Critical Reading & Evaluation`
-   ) %>% 
-  spread(project_year,score) %>% 
-  rename( score_y1 = `1`,
-          score_y2 = `2`)
+    select(studentid, project_year, sr_sqr, sr_ca, sr_cre) %>%
+    group_by(studentid) %>%
+    filter(n() > 1) %>%
+    ungroup %>%
+    rename(
+    "Scientific & Quantitative Reasoning" = sr_sqr,
+    "Critique an Argument" = sr_ca,
+    "Critical Reading & Evaluation" = sr_cre
+    ) %>%
+    gather(
+    task, score, `Scientific & Quantitative Reasoning`, `Critique an Argument`, `Critical Reading & Evaluation`
+    ) %>%
+    spread(project_year,score) %>%
+    rename(score_y1 = `1`,
+    score_y2 = `2`)
+} else {
+  data <- CLA %>%
+    group_by(studentid) %>%
+    filter(discipline %in% p.select,!is.na(sr_sqr),!is.na(sr_ca),!is.na(sr_cre)) %>%
+    filter(n() > 1) %>%
+    ungroup %>%
+    mutate(project_year = as.numeric(project_year)) %>%
+    select(studentid, project_year, sr_sqr, sr_ca, sr_cre) %>%
+    group_by(studentid) %>%
+    filter(n() > 1) %>%
+    ungroup %>%
+    rename(
+    "Scientific & Quantitative Reasoning" = sr_sqr,
+    "Critique an Argument" = sr_ca,
+    "Critical Reading & Evaluation" = sr_cre
+    ) %>%
+    gather(
+    task, score, `Scientific & Quantitative Reasoning`, `Critique an Argument`, `Critical Reading & Evaluation`
+    ) %>%
+    spread(project_year,score) %>%
+    rename(score_y1 = `1`,
+    score_y2 = `2`)
+}
 
 summary.data <- data %>% 
   group_by(task) %>% 
   summarize_each(funs(mean), -studentid, -task)  %>% 
   mutate_each(funs(floor), -task)
 
-ggplot(data) +
+data %>% 
+  ggplot() +
   geom_segment(aes(group = studentid, x = 1.02, xend = 1.98, y = score_y1, yend = score_y2), alpha = 0.2) +
   geom_segment(aes(x = 1.02, xend = 1.98,  y = score_y1, yend = score_y2), size = 1, color = "blue", summary.data) +
   geom_text(aes(label = score_y1, x = 1, y = score_y1), color = "blue", fontface = "bold", summary.data) +
@@ -402,7 +540,7 @@ As previously stated, the CAT assesses a consensus core set of five skills that 
 ```{r CAT_scores, fig.width = 10, fig.height = 6,  fig.cap = paste0(params$dept_title, ": CAT Scores"),  fig.fullwidth = TRUE}
 
 if(nrow(CAT %>%
-        filter(discipline %in% p.select,!is.na(score)) %>%
+        filter(discipline %in% p.select, !is.na(score)) %>%
         group_by(project_year) %>%
         tally) < 2)
         {
@@ -417,8 +555,14 @@ if(nrow(CAT %>%
         data <- data %>%
         mutate(fill = ifelse(score == mean,"blue","grey50"))
         
+        max <- data %>% 
+          mutate(score = floor(score)) %>% 
+          group_by(score) %>% tally %>% ungroup %>% select(n) %>% max() 
+          
+        
         ggplot(data, aes(x = factor(trunc(score)))) +
         geom_bar(aes(fill = fill)) +
+        geom_hline(yintercept = seq(0, max, 2), col = "white", lwd = 1) +
         coord_flip() +
         xlab("\nCAT Score") +
         ylab(str_wrap("Counts", 5)) +
@@ -514,12 +658,30 @@ The numbers presented in the graph represent the mean performance of students on
 
 devtools::source_url("https://raw.githubusercontent.com/jkaupp/r-slopegraph/master/slopegraph.r")
 
-data <- VALUE %>%
-  filter(discipline %in% p.select, level!="Not Assessed") %>%
-  mutate(project_year = as.numeric(project_year),
-         semester = ifelse(course %in% c(101, 100, 104), 1, ifelse(course == 103, 2, ifelse(params$dept %in% c("MINE","CIVL","MTHE","ENPH","ECE","MECH","PSYC","DRAM") & course %in% c(200, 203), 3, 4)))) %>% 
+
+if(params$dept == "PSYC")
+{
+  data <- VALUE %>%
+   group_by(studentid) %>% 
+   filter(subject == params$dept, level!="Not Assessed") %>%
+   filter(n()>1) %>% 
+   ungroup %>% 
+   mutate(project_year = as.numeric(project_year),
+         semester = ifelse(course %in% c(101, 100, 104), 1, ifelse(course == 103, 2, ifelse(params$dept %in% c("MINE","CIVL","MTHE","ENPH","ECE","MECH","DRAM") & course %in% c(200, 203), 3, 4)))) %>% 
   select(-c(project_year, course, subject, consent, discipline)) %>% 
   mutate(level = as.numeric(level)) 
+} else {
+  data <- VALUE %>%
+    group_by(studentid) %>%
+    filter(discipline %in% p.select, level!="Not Assessed") %>%
+    filter(n() > 1) %>%
+    ungroup %>%
+    mutate(project_year = as.numeric(project_year),
+         semester = ifelse(course %in% c(101, 100, 104), 1, ifelse(course == 103, 2, ifelse(params$dept %in% c("MINE","CIVL","MTHE","ENPH","ECE","MECH","DRAM") & course %in% c(200, 203), 3, 4)))) %>% 
+  select(-c(project_year, course, subject, consent, discipline)) %>% 
+  mutate(level = as.numeric(level)) 
+}
+
   
 summary.data <- data %>% 
   group_by(rubric, semester) %>% 
@@ -529,7 +691,7 @@ summary.data <- data %>%
  
 
 build_slopegraph(summary.data, x="semester", y="level", group="rubric", method="tufte", min.space=0.05) %>% 
-  mutate(x = factor(x, levels = c(1,2,3), labels = str_wrap(c("Fall 2013-2014","Winter 2013-2014","Fall 2014-2015"), 6)),
+  mutate(x = factor(x, levels = c(1,2,3,4), labels = str_wrap(c("Fall 2013-2014","Winter 2014-2015","Fall 2014-2015","Winter 2015-2016"), 6)),
          y = round(y,1),
          group = str_wrap(group, 8),
          colour = "grey80",
@@ -545,13 +707,25 @@ The individual VALUE rubric sub scores reveal the strengths and weakeness of stu
 
 ```{r VALUE_subscores, fig.width = 16, fig.height = 15,  fig.cap = paste0(params$dept_title, ": VALUE Rubric Sub Scores"),  fig.fullwidth = TRUE}
 
-data <- VALUE %>%
-  filter(discipline %in% p.select,!is.na(level)) %>%
-  mutate(semester = factor(semester, levels = c(1,2,3,4), labels = c("Fall 2013-2014","Winter 2014-2015","Fall 2014-2015","Winter 2015-2016"))) %>% 
-  select(-c(course, subject, consent, discipline)) 
+if(params$dept == "PSYC")
+{
+  data <- VALUE %>%
+   filter(subject == params$dept, !is.na(level)) %>%
+   mutate(semester = factor(semester, levels = c(1,2,3,4), labels = c("Fall 2013-2014","Winter 2014-2015","Fall 2014-2015","Winter 2015-2016"))) %>% 
+   select(-c(course, subject, consent, discipline, `first year discipline`)) 
+} else {
+  data <- VALUE %>%
+    filter(discipline %in% p.select, !is.na(level)) %>%
+    mutate(semester = factor(semester, levels = c(1,2,3,4), labels = c("Fall 2013-2014","Winter 2014-2015","Fall 2014-2015","Winter 2015-2016"))) %>% 
+    select(-c(course, subject, consent, discipline)) 
+}
+
 
 max <- data %>%
   group_by(semester, rubric, dimension, level) %>% tally %>% ungroup %>% select(n) %>% max() 
+
+div <- ifelse(max> 100,25,ifelse(max>=50,10, 5))
+  
 
 ggplot(subset(data, rubric == "Critical Thinking"), aes(x = factor(level))) +
   geom_bar(fill = "grey50", position = position_dodge(), binwidth = 0.5) +
@@ -559,12 +733,13 @@ ggplot(subset(data, rubric == "Critical Thinking"), aes(x = factor(level))) +
   xlab("Level\n") +
   ylab("\nCount") +
   ggtitle("VALUE Rubric: Critical Thinking") +
-  geom_hline(yintercept = seq(0, max, 5), col = "white", lwd = 1) +
+  geom_hline(yintercept = seq(0, max, div), col = "white", lwd = 1) +
   facet_grid(dimension ~ semester, labeller = label_wrap_gen(width=10)) +
   theme_tufte(base_size = 20) +
   theme(legend.position = "none",
         strip.text.y = element_text(angle = 0),
         axis.title.y = element_text(angle = 0)) +
+  scale_y_continuous(limits = c(0, round_any(max,div))) +
   scale_x_discrete(limits = c("Not Assessed", "Below Benchmark 1", "Benchmark 1", "Milestone 2", "Milestone 3", "Capstone 4"))
 
 ggplot(subset(data, rubric == "Problem Solving"), aes(x = factor(level))) +
@@ -573,12 +748,13 @@ ggplot(subset(data, rubric == "Problem Solving"), aes(x = factor(level))) +
   xlab("Level\n") +
   ylab("\nCount") +
   ggtitle("VALUE Rubric: Problem Solving") +
-  geom_hline(yintercept = seq(0, max, 5), col = "white", lwd = 1) +
+  geom_hline(yintercept = seq(0, max, div), col = "white", lwd = 1) +
   facet_grid(dimension ~ semester, labeller = label_wrap_gen(width=10)) +
   theme_tufte(base_size = 20) +
   theme(legend.position = "none",
         strip.text.y = element_text(angle = 0),
         axis.title.y = element_text(angle = 0)) +
+  scale_y_continuous(limits = c(0, round_any(max,div))) +
   scale_x_discrete(limits = c("Not Assessed", "Below Benchmark 1", "Benchmark 1", "Milestone 2", "Milestone 3", "Capstone 4"))
 
 ggplot(subset(data, rubric == "Written Communication"), aes(x = factor(level))) +
@@ -587,12 +763,13 @@ ggplot(subset(data, rubric == "Written Communication"), aes(x = factor(level))) 
   xlab("Level\n") +
   ylab("\nCount") +
   ggtitle("VALUE Rubric: Written Communication") +
-  geom_hline(yintercept = seq(0, max, 5), col = "white", lwd = 1) +
+  geom_hline(yintercept = seq(0, max, div), col = "white", lwd = 1) +
   facet_grid(dimension ~ semester, labeller = label_wrap_gen(width=10)) +
   theme_tufte(base_size = 20) +
   theme(legend.position = "none",
         strip.text.y = element_text(angle = 0),
         axis.title.y = element_text(angle = 0)) +
+  scale_y_continuous(limits = c(0, round_any(max,div))) +
   scale_x_discrete(limits = c("Not Assessed", "Below Benchmark 1", "Benchmark 1", "Milestone 2", "Milestone 3", "Capstone 4"))
 
 ```
@@ -637,7 +814,7 @@ Ideally, should longitudinal data for this survey exist programs could use it to
 
 These results presented below are horizontal histograms aggregate of all students, paneled by year when possible.  The charts contrast each of the scale items of the TLO showing the instrument calculated score of the student (mean score of scale items), alongside their self rating. 
 
-```{r TLO_results, fig.width = 16, fig.height = 20,  fig.cap = paste0(params$dept_title, ": Transferrable Learning Orientations Results"),  fig.fullwidth = TRUE, results = "asis", comment = NA}
+```{r TLO_results, fig.width = 16, fig.height = 20,  fig.cap = paste0(params$dept_title, ": Transferrable Learning Orientations Results"),fig.fullwidth = TRUE, results = "asis", comment = NA}
 library(scales)
 
 scale.data <- TLO %>% 
@@ -745,6 +922,18 @@ ggplot(df) +
         axis.ticks.y = element_blank())
 }
 
+count <- data %>% group_by(studentid) %>% select(studentid) %>% distinct %>% nrow()
+
+if (count <= 5){
+  df <- data.frame()
+  ggplot(df) + geom_point() + xlim(0, 10) + ylim(0, 10) +
+    annotate("text",5,5, label="Too few reponses to the TLO", color = "grey50") +
+    theme(rect = element_blank(),
+        text = element_blank(),
+        line = element_blank(),
+        title = element_blank())
+} else {
+
 SR <- tlo_item_hist(subset(data, scale=="Self Regulation"), sr_resp, "none")
 OM <- tlo_item_hist(subset(data, scale=="Outcome Motivation"), om_resp, "none")
 TR <- tlo_item_hist(subset(data, scale=="Transfer"), tr_resp, "bottom")
@@ -761,7 +950,7 @@ grid.arrange(
 
 grid.arrange(
     grobs = plots2, ncol = 1)
-    
+}    
 ```
 
 ## Confounding Factors
