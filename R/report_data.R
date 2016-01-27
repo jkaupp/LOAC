@@ -18,7 +18,6 @@ library(gdata)
 # Connection to LOAC Database 
 odbcCloseAll()
 
-con <- odbcConnect("FEAS-HEQCO", uid="AD\\kauppj", pwd="Laurenque5pge!")
 
 student_info <- sqlFetch(con, "student_info")
 cla_plus <-sqlFetch(con, "cla_plus")
@@ -118,9 +117,24 @@ sy.value <- student_info %>%
   select(studentid, program_year, subject, course, consent, everything()) %>% 
   rename(project_year = program_year)
 
+
+finalyear.value <- student_info %>% 
+  filter(semester==8) %>% 
+  rename(`second year discipline`= plan) %>% 
+  inner_join(value,., by=c("studentid","subject","course")) %>% 
+  filter(level!=99) %>% 
+  unite(dimension1, rubric, dimension) %>% 
+  rename(dimension = dimension1) %>% 
+  group_by(studentid, subject, course, artifact,`second year discipline`, year, semester, consent, dimension) %>% 
+  summarize(level=trunc(mean(level))) %>% 
+  spread(dimension,level) %>% 
+  mutate(program_year=4) %>% 
+  select(studentid, program_year, subject, course, consent, everything()) %>% 
+  rename(project_year = program_year)
+
 #Entire VALUE Data frame
 
-VALUE <- bind_rows(fy.value,sy.value) %>% 
+VALUE <- bind_rows(fy.value,sy.value,finalyear.value) %>% 
   left_join(sy.loac %>% select(studentid,`second year discipline`), by=c("studentid")) %>% 
   rename(discipline = `second year discipline.y`) %>% 
   select(-`second year discipline.x`) %>% 

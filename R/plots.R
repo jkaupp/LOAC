@@ -381,3 +381,54 @@ png("Score Effort and Time.png", width = 1600, height = 1000)
 grid.arrange(textGrob("Effort", y=0.5, gp = gpar(fontsize = 24, fontface = "bold")), effort, textGrob("Time", y=0.56, gp = gpar(fontsize = 24, fontface = "bold")), time, layout_matrix = layout)
 
 dev.off()
+
+
+full.loac %>% 
+  filter(grepl("BSE",discipline), consent>1, test!="MSLQ") %>% 
+  mutate(discipline = str_sub(discipline,1,4)) %>% 
+  mutate(discipline = ifelse(discipline == "ENCH", "CHEE", discipline)) %>% 
+  mutate(discipline = ifelse(discipline %in% c("CMPE","ELEC"), "ECE", discipline)) %>% 
+  group_by(discipline,project_year,test) %>% 
+  tally() %>% 
+  ungroup %>% 
+  ggplot(aes(x = project_year, y = n)) +
+  geom_path(aes(group = test, color = test), size = 2) +
+  geom_path(aes(group = 1), stat = "summary", fun.y = "sum", size = 2, color = "grey50") +
+  geom_label(aes(label = n, color = test), size = 6, show.legend = FALSE) +
+  geom_label(aes(label = ..y..), stat = "summary", fun.y = "sum", size = 6, show.legend = FALSE, color = "grey50") +
+  geom_segment(aes(y = Inf, yend = Inf, x = -Inf, xend = Inf), size = 0.5, alpha = 0.5, color = "grey80") +
+  facet_wrap(~discipline, nrow = 2) +
+  labs(x="",y="",title="Number of Consenting Students by Test and Total") +
+  scale_color_tableau(name = "") +
+  scale_x_discrete(labels = c("1"="First Year", "2"="Second Year")) +
+  theme_tufte(base_size = 20) +
+  theme(text = element_text(color = "grey20"),
+        axis.text.y = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title.y = element_blank(),
+        strip.text = element_text(color = "grey20")) 
+
+full.loac %>% 
+  filter(!grepl("BSE",discipline), consent>1, test %in% c("CAT", "CLA+")) %>% 
+  group_by(subject,project_year,test) %>% 
+  tally() %>% 
+  ungroup %>% 
+  ggplot(aes(x = project_year, y = n)) +
+  geom_path(aes(group = test, color = test), size = 2) +
+  geom_path(aes(group = 1), stat = "summary", fun.y = "sum", size = 2, color = "grey50") +
+  geom_label(aes(label = n, color = test), size = 6, show.legend = FALSE) +
+  geom_label(aes(label = ..y..), stat = "summary", fun.y = "sum", size = 6, show.legend = FALSE, color = "grey50") +
+  geom_segment(aes(y = Inf, yend = Inf, x = -Inf, xend = Inf), size = 0.5, alpha = 0.5, color = "grey80") +
+  facet_wrap(~subject, nrow = 1) +
+  labs(x="",y="",title="Number of Consenting Students by Test and Total") +
+  scale_color_tableau(name = "") +
+  scale_x_discrete(labels = c("1"="First Year", "2"="Second Year")) +
+  theme_tufte(base_size = 20) +
+  theme(text = element_text(color = "grey20"),
+        axis.text.y = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title.y = element_blank(),
+        strip.text = element_text(color = "grey20")) 
+
+ggsave("FAS Test Counts.png", dpi = 300, scale = 2)
+

@@ -674,10 +674,10 @@ if(params$dept == "PSYC")
   data <- VALUE %>%
     group_by(studentid) %>%
     filter(discipline %in% p.select, level!="Not Assessed") %>%
-    filter(n() > 1) %>%
+   filter(n() > 1) %>%
     ungroup %>%
-    mutate(project_year = as.numeric(project_year),
-         semester = ifelse(course %in% c(101, 100, 104), 1, ifelse(course == 103, 2, ifelse(params$dept %in% c("MINE","CIVL","MTHE","ENPH","ECE","MECH","DRAM") & course %in% c(200, 203), 3, 4)))) %>% 
+     mutate(project_year = as.numeric(project_year),
+          semester = ifelse(course %in% c(101, 100, 104), 1, ifelse(course == 103, 2, ifelse(params$dept %in% c("MINE","CIVL","MTHE","ENPH","ECE","MECH","DRAM") & course %in% c(200, 203), 3, 4)))) %>% 
   select(-c(project_year, course, subject, consent, discipline)) %>% 
   mutate(level = as.numeric(level)) 
 }
