@@ -382,24 +382,59 @@ grid.arrange(textGrob("Effort", y=0.5, gp = gpar(fontsize = 24, fontface = "bold
 
 dev.off()
 
+anonymized_dept <- data_frame(discipline = c("CHEE","CIVL","ECE","ENPH","GEOE","MECH","MINE","MTHE"),
+                              anon.disc = rep(1:8))
 
-full.loac %>% 
+# student_info %>% 
+#   filter(program=="BSCE", consent>1, test!="MSLQ", test!="DNT", test != "", test!="DSA", course!="103") %>% 
+#   mutate(discipline = str_sub(plan,1,4)) %>% 
+#   mutate(discipline = ifelse(discipline == "ENCH", "CHEE", discipline)) %>% 
+#   mutate(discipline = ifelse(discipline %in% c("CMPE","ELEC"), "ECE", discipline)) %>% 
+#   mutate(project_year = ifelse(semester %in% c(1,2), 1, ifelse(semester %in% c(3,4), 2, ifelse(semester %in% c(5,6), 3, 4)))) %>% 
+#   filter(project_year <= 2) %>% 
+#   group_by(discipline,project_year,test) %>% 
+#   tally() %>% 
+#   ungroup %>% 
+#   left_join(anonymized_dept, by = "discipline") %>% 
+#   filter(!is.na(anon.disc)) %>% 
+# ggplot(aes(x = project_year, y = n)) +
+#   geom_path(aes(group = test, color = test), size = 2) +
+#   geom_path(aes(group = 1), stat = "summary", fun.y = "sum", size = 2, color = "grey50", show.legend = TRUE) +
+#   geom_label(aes(label = n, color = test), size = 6, show.legend = FALSE) +
+#   geom_label(aes(label = ..y..), stat = "summary", fun.y = "sum", size = 6, show.legend = FALSE, color = "grey50") +
+#   geom_segment(aes(y = Inf, yend = Inf, x = -Inf, xend = Inf), size = 0.5, alpha = 0.5, color = "grey80") +
+#   facet_wrap(~anon.disc, nrow = 2) +
+#   labs(x="",y="",title="Number of Consenting Students by Test and Total") +
+#   scale_color_tableau(name = "") +
+#   scale_x_discrete(labels = c("1"="First Year", "2"="Second Year")) +
+#   theme_tufte(base_size = 20) +
+#   theme(text = element_text(color = "grey20"),
+#         axis.text.y = element_blank(),
+#         axis.ticks = element_blank(),
+#         axis.title.y = element_blank(),
+#         strip.text = element_text(color = "grey20")) 
+
+
+
+sub_with_data %>% 
   filter(grepl("BSE",discipline), consent>1, test!="MSLQ") %>% 
   mutate(discipline = str_sub(discipline,1,4)) %>% 
   mutate(discipline = ifelse(discipline == "ENCH", "CHEE", discipline)) %>% 
   mutate(discipline = ifelse(discipline %in% c("CMPE","ELEC"), "ECE", discipline)) %>% 
   group_by(discipline,project_year,test) %>% 
   tally() %>% 
+  {
+    rbind(., tally(.) %>% mutate(test = "Total Sample"))
+  } %>%
   ungroup %>% 
+  left_join(anonymized_dept, by = "discipline") %>% 
   ggplot(aes(x = project_year, y = n)) +
   geom_path(aes(group = test, color = test), size = 2) +
-  geom_path(aes(group = 1), stat = "summary", fun.y = "sum", size = 2, color = "grey50") +
   geom_label(aes(label = n, color = test), size = 6, show.legend = FALSE) +
-  geom_label(aes(label = ..y..), stat = "summary", fun.y = "sum", size = 6, show.legend = FALSE, color = "grey50") +
   geom_segment(aes(y = Inf, yend = Inf, x = -Inf, xend = Inf), size = 0.5, alpha = 0.5, color = "grey80") +
-  facet_wrap(~discipline, nrow = 2) +
+  facet_wrap(~anon.disc, nrow = 2) +
   labs(x="",y="",title="Number of Consenting Students by Test and Total") +
-  scale_color_tableau(name = "") +
+  scale_color_manual("", values = c("CAT"="#1F77B4","CLA+"="#FF7F0E","Total Sample"="grey50")) +
   scale_x_discrete(labels = c("1"="First Year", "2"="Second Year")) +
   theme_tufte(base_size = 20) +
   theme(text = element_text(color = "grey20"),
@@ -430,5 +465,5 @@ full.loac %>%
         axis.title.y = element_blank(),
         strip.text = element_text(color = "grey20")) 
 
-ggsave("FAS Test Counts.png", dpi = 300, scale = 2)
+ggsave("FEAS Test Counts.png", width = 16, height = 12, dpi = 300)
 

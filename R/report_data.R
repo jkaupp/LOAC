@@ -14,21 +14,35 @@ library(grid)
 library(gridExtra)
 library(gdata)
 
+
+#Function to dcast and write VALUE rubric data
+VALUE_cast <- function(df){
+  df %>% 
+    distinct %>% 
+    dcast(., studentid + project_year + year + plan + course + artifact + consent  ~ dimension, value.var = "level", fun.aggregate = NULL) %>% 
+    write.csv(file=paste("Full",df$rubric[[1]],"VALUE Rubric Data", Sys.Date(),".csv",sep=" "))
+}
+
+
+
+
 # Connections and Directories ----
 # Connection to LOAC Database 
 odbcCloseAll()
 
 
-student_info <- sqlFetch(con, "student_info")
+student_info <- sqlFetch(con, "student_info", rownames = FALSE)
 cla_plus <-sqlFetch(con, "cla_plus")
 tlo <-sqlFetch(con, "tlo")
 value <-sqlFetch(con, "value")
 cat <- sqlFetch(con, "cat")
+dropped_student_info <- sqlFetch(con, "dropped_students")
 
 fy.loac <- student_info %>% 
-  filter(semester==1, course!=103) %>% 
-  rename(`first year discipline` = plan) %>% 
-  distinct(studentid)
+  # filter(semester==1, course!=103) %>% 
+  filter(semester == 1 | semester == 2) %>% 
+  rename(`first year discipline` = plan)
+  # distinct(studentid)
 
 sy.loac <- student_info %>% 
   filter(semester==3 | semester==4, subject != "ENPH") %>% 
@@ -88,13 +102,12 @@ CLA <- full.loac %>%
 # Create first year data frame for VALUE 
 fy.value <- student_info %>% 
   filter(semester== 2 | semester== 1) %>% 
-  rename(`first year discipline`= plan) %>% 
   inner_join(value,., by=c("studentid","subject","course")) %>% 
   filter(level!=99) %>% 
-  select(studentid, subject, course, artifact, rubric, dimension, level, `first year discipline`, year, semester, consent) %>% 
+  select(studentid, subject, course, artifact, rubric, dimension, level, plan, year, semester, consent) %>% 
   unite(dimension1, rubric, dimension) %>% 
   rename(dimension = dimension1) %>% 
-  group_by(studentid, subject, course, artifact,`first year discipline`, year, semester, consent, dimension) %>% 
+  group_by(studentid, subject, course, artifact,plan, year, semester, consent, dimension) %>% 
   summarize(level = trunc(mean(level))) %>% 
   spread(dimension,level) %>% 
   mutate(program_year=1) %>% 
@@ -105,12 +118,11 @@ fy.value <- student_info %>%
 # Create second year data frame
 sy.value <- student_info %>% 
   filter(semester==3 | semester==4, subject!="ENPH") %>% 
-  rename(`second year discipline`= plan) %>% 
   inner_join(value,., by=c("studentid","subject","course")) %>% 
   filter(level!=99) %>% 
   unite(dimension1, rubric, dimension) %>% 
   rename(dimension = dimension1) %>% 
-  group_by(studentid, subject, course, artifact,`second year discipline`, year, semester, consent, dimension) %>% 
+  group_by(studentid, subject, course, artifact, plan, year, semester, consent, dimension) %>% 
   summarize(level=trunc(mean(level))) %>% 
   spread(dimension,level) %>% 
   mutate(program_year=2) %>% 
@@ -120,12 +132,11 @@ sy.value <- student_info %>%
 
 finalyear.value <- student_info %>% 
   filter(semester==8) %>% 
-  rename(`second year discipline`= plan) %>% 
   inner_join(value,., by=c("studentid","subject","course")) %>% 
   filter(level!=99) %>% 
   unite(dimension1, rubric, dimension) %>% 
   rename(dimension = dimension1) %>% 
-  group_by(studentid, subject, course, artifact,`second year discipline`, year, semester, consent, dimension) %>% 
+  group_by(studentid, subject, course, artifact,plan, year, semester, consent, dimension) %>% 
   summarize(level=trunc(mean(level))) %>% 
   spread(dimension,level) %>% 
   mutate(program_year=4) %>% 
@@ -134,11 +145,11 @@ finalyear.value <- student_info %>%
 
 #Entire VALUE Data frame
 
-VALUE <- bind_rows(fy.value,sy.value,finalyear.value) %>% 
-  left_join(sy.loac %>% select(studentid,`second year discipline`), by=c("studentid")) %>% 
-  rename(discipline = `second year discipline.y`) %>% 
-  select(-`second year discipline.x`) %>% 
-  gather(.,rubric1, level, 10:ncol(.), -discipline) %>% 
+VALUE <- bind_rows(fy.value,sy.value,finalyear.value) %>%
+#   left_join(sy.loac %>% select(studentid,`second year discipline`), by=c("studentid")) %>% 
+#   rename(discipline = `second year discipline.y`) %>% 
+#   select(-`second year discipline.x`) %>% 
+  gather(.,rubric1, level, 10:ncol(.), -plan) %>% 
   separate(.,rubric1,c("rubric","dimension"), sep="_") %>% 
   mutate(level = ifelse(is.na(level),99,level))
 
@@ -191,14 +202,6 @@ TLO %<>%
          project_year = as.numeric(project_year))
 
 
-# Function to dcast and write VALUE rubric data
-# VALUE_cast <- function(df){
-#   df %>% 
-#     distinct %>% 
-#     dcast(., studentid + project_year + course + consent + discipline ~ dimension, value.var = "level", fun.aggregate = NULL) %>% 
-#     write.csv(file=paste("Full",df$rubric[[1]],"VALUE Rubric Data 20-11-2015.csv",sep=" "))
-# }
-
 
 
 # CLA %>% 
@@ -211,9 +214,9 @@ TLO %<>%
 # 
 # VALUE %>% 
 #   unite(course_code, subject, course, sep = " ") %>% 
-#   rename(course = course_code) %>% 
+#   dplyr::rename(course = course_code) %>% 
 #   d_ply(.,.(rubric), VALUE_cast)
-#   
+# #   
 # 
 # value %>% 
 #   semi_join(., subset(student_info, consent>1), by = c("studentid", "subject", "course")) %>% 
