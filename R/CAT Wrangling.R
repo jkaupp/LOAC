@@ -1,34 +1,31 @@
 library(magrittr)
 library(dplyr)
+library(readxl)
+library(purrr)
 library(stringr)
-library(rio)
+library(jkmisc)
 library(tidyr)
+library(haven)
+library(DBI)
 
-# Connections and Directories ----
-source("Student Wrangling.R")
+loac <- RSQLServer::src_sqlserver("FEAS", database = "HEQCO-LOAC")
 
+files <- list.files("~/ownCloud/Shared/Data/Project_Year3/", full.names = TRUE, pattern = "Queens_CAT_Data_File")
 
-# Directory for VALUE Rubric Data
-data.dir <- "/Users/Jake/ownCloud/Engineering Education Research/HEQCO/LOAC Project/CAT/"
+cat_pdf <- list.files("~/ownCloud/Shared/Data/Project_Year3/", full.names = TRUE, pattern = "Queens_CAT_Report_June_2016_New_Version6")
 
-# Read all files in the data dir into a list
-cat.data <- list.files(data.dir, full.names = TRUE) %>% 
-  lapply(import) %>% 
-  plyr::rbind.fill() %>% 
-  select(`Student ID`, Subject, Course, `CAT Score`) %>% 
-  rename(subject = Subject,
-         course = Course,
-         studentid = `Student ID`,
-         score = `CAT Score`) %>% 
-  filter(!is.na(score)) %>%
-  left_join(student_info, by=c("studentid","subject","course")) 
+v6_conversion <- tabulizer::extract_tables(cat_pdf,pages = 10) %>% 
+  as.data.frame() %>% 
+  select(-X3) %>% 
+  slice(-1) %>% 
+  set_colnames(c("question","coefficient")) %>% 
+  mutate_each(funs(as.character)) %>% 
+  mutate(coefficient = as.numeric(coefficient))
 
+cat_headers <- loac %>% 
+  tbl("cat") %>% 
+  colnames
 
- cat.data %>% 
-  filter(course==200,subject=="APSC") %>% 
-  select(studentid,course,subject,plan,score) %>% 
-  mutate(plan=str_sub(plan,1,4)) %>% 
-  write.csv("APSC 200 CAT.csv")
 
  
 cat_local_code <- data_frame(loc_code = c(2104,3102,4103,1100,2501,4206,2207,3208,1205),
@@ -59,27 +56,37 @@ cat_mapping <- data_frame(question = c("q1f", "q2f", "q3f", "q4f", "q5f",
                                     "Problem Solving",
                                     "Creative Thinking",
                                     "Effective Communication"))
-#                          `Evaluate and Interpret Information` = c(1,1,0,0,1,0,0,1,0,1,1,0,1,1,0,0),
-#                          `Problem Solving` = c(0,0,0,1,0,0,1,0,0,1,1,1,1,1,1,0),
-#                          `Creative Thinking` = c(0,0,1,1,0,1,1,0,1,0,0,0,0,0,1,0),
-#                          `Effective Communication` = c(0,1,1,1,0,1,1,0,1,0,1,0,0,1,1,0))
+
   
 
-full_cat <- import(paste0(data.dir, "Queens_Univ_CAT_Data_File.xlsx"), sheet = 1) %>% 
-  select(stude1,loc_code, q1f:total) %>% 
+cat_y3 <- read_excel(files) %>% 
   rename(studentid = stude1,
          score_f = total) %>% 
-  left_join(.,cat_local_code, by = "loc_code") %>% 
-  left_join(cat,.,by = c("studentid","course","subject")) %>% 
-  mutate(`Evaluate and Interpret Information (CAT)` = (q1f+q2f+q5f+q8f+q10f+q11f+q13f+q14f),
-         `Problem Solving (CAT)` = (q4f+q7f+q10f+q11f+q12f+q13f+q14f+q15f),
-         `Creative Thinking (CAT)` = (q3f+q4f+q6f+q7f+q9f+q15f),
-         `Effective Communication (CAT)` = (q2f+q3f+q4f+q6f+q7f+q9f+q11f+q14f+q15f))  
+  select(one_of(cat_headers),testversion) %>% 
+  mutate(EvaluateandInterpretInformation = (q1f+q2f+q5f+q8f+q10f+q11f+q13f+q14f),
+         ProblemSolving = (q4f+q7f+q10f+q11f+q12f+q13f+q14f+q15f),
+         CreativeThinking = (q3f+q4f+q6f+q7f+q9f+q15f),
+         EffectiveCommunication = (q2f+q3f+q4f+q6f+q7f+q9f+q11f+q14f+q15f),
+         term = 2161) 
+
+
+  mutate(q1f = q1f*v6_conversion[v6_conversion$question == "Q1",2],
+         q2f = q2f*v6_conversion[v6_conversion$question == "Q2",2],
+         q3f = q3f*v6_conversion[v6_conversion$question == "Q3",2],
+         q4f = q4f*v6_conversion[v6_conversion$question == "Q4",2],
+         q5f = q5f*v6_conversion[v6_conversion$question == "Q5",2],
+         q6f = q6f*v6_conversion[v6_conversion$question == "Q6",2],
+         q7f = q7f*v6_conversion[v6_conversion$question == "Q7",2],
+         q8f = q8f*v6_conversion[v6_conversion$question == "Q8",2],
+         q9f = q9f*v6_conversion[v6_conversion$question == "Q9",2],
+         q10f = q10f*v6_conversion[v6_conversion$question == "Q10",2],
+         q11f = q11f*v6_conversion[v6_conversion$question == "Q11",2],
+         q12f = q12f*v6_conversion[v6_conversion$question == "Q12",2],
+         q13f = q13f*v6_conversion[v6_conversion$question == "Q13",2],
+         q14f = q14f*v6_conversion[v6_conversion$question == "Q14",2],
+         q15f = q15f*v6_conversion[v6_conversion$question == "Q15",2]) %>% 
+  mutate(score_f = q1f + q2f + q3f + q4f + q5f + q6f + q7f + q8f + q9f + q10f + q11f + q12f + q13f + q14f + q15f) 
   
-m.full_cat <- full_cat %>%   
-  select(-score) %>% 
-  gather(question,score,q1f:`Effective Communication`) %>% 
-  left_join(.,cat_mapping, by = "question")
-
-
+         
+  
 

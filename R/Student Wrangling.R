@@ -1,77 +1,41 @@
-library(magrittr)
-library(stringr)
-library(dplyr)
+library(tidyverse)
 library(readxl)
-library(data.table)
+library(DBI)
 
-# Read data for Courses ----
-base.dir <- "~/ownCloud/Engineering Education Research/HEQCO/LOAC Project/" 
+loac <- RSQLServer::src_sqlserver("FEAS", database = "HEQCO-LOAC")
 
-apsc.100 <- paste0(base.dir,"APSC 100/Course Information/APSC 100 Master List.xlsx") %>% 
-  read_excel(.,"Master")
+student_info <- loac %>% 
+ tbl("student_info") %>% 
+  collect()
 
-apsc.200f <- paste0(base.dir,"APSC 200/Course Information/APSC 200 Master List.xlsx") %>% 
-  read_excel(.,"Master_F") %>% 
-  mutate(team = as.character(team))
+updated_info <- list.files("./data", full.names = TRUE, pattern = "info") %>% 
+  map_df(~read_excel(.x, skip = 1)) 
 
-apsc.200w <- paste0(base.dir,"APSC 200/Course Information/APSC 200 Master List.xlsx") %>% 
-  read_excel(.,"Master_W") %>% 
-  mutate(team = as.character(team))
+ui_1 <- updated_info %>% 
+  jkmisc::clean_names() %>% 
+  rename(studentid = id) %>% 
+  mutate_each(funs(as.numeric), studentid, term) %>% 
+  group_by(studentid, term, first_name, middle, last) %>% 
+  summarize(acad_prog = paste(unique(acad_prog), collapse = "|"),
+            acad_plan = paste(unique(acad_plan), collapse = "|")) 
 
-apsc.480 <- paste0(base.dir,"APSC 480/APSC 480.xlsx") %>% 
-  read_excel(.,"Master")  %>% 
-  mutate(team = as.character(team))
 
-civl.471 <- paste0(base.dir,"CIVL 471/CIVL 471.xlsx") %>% 
-  read_excel(.,"Master")  
+list <- ui_1 %>% 
+  group_by(studentid) %>% 
+  top_n(1, term)
 
-geoe.447 <- paste0(base.dir,"GEOE 447/GEOE 447.xlsx") %>% 
-  read_excel(.,"Master") %>% 
-  mutate(team = as.character(team))
+updated <- student_info %>% 
+  distinct(studentid) %>% 
+  select(studentid) %>% 
+  left_join(list)
 
-mech.462 <- paste0(base.dir,"MECH 462/MECH 462.xlsx") %>% 
-  read_excel(.,"Master") %>% 
-  mutate(team = as.character(team))
+heighten <- list.files("./data", full.names = TRUE, pattern = "HEI") %>% 
+  read_excel() %>% 
+  jkmisc::clean_names() %>% 
+  mutate(term = 2161) %>% 
+  select(term, studentid = student_id, everything())
 
-enph.460 <- paste0(base.dir,"PHYS 460/PHYS 460.xlsx") %>% 
-  read_excel(.,"Master") %>% 
-  mutate(team = as.character(team))
-
-FAS.files <-paste0(base.dir,"FAS") %>% 
-  list.files(full.names=TRUE)
-
-FAS.list <-lapply(FAS.files, read_excel, sheet="Master")
+dbWriteTable(loac$con, "heighen", heighten)
 
 
 
-FAS.list[[1]]$program %<>% as.character()
-FAS.list[[2]]$program %<>% as.character()
-FAS.list[[3]]$program %<>% as.character()
-FAS.list[[4]]$program %<>% as.character()
-
-
-FAS.list[[1]]$plan %<>% as.character()
-FAS.list[[2]]$plan %<>% as.character()
-FAS.list[[3]]$plan %<>% as.character()
-FAS.list[[4]]$plan %<>% as.character()
-
-
-
-df.FAS <- bind_rows(FAS.list) %>% 
-  mutate(team = as.character(team))
-
-master <- bind_rows(list(apsc.100,apsc.200f,apsc.200w,apsc.480,civl.471,geoe.447,mech.462,enph.460,df.FAS))
-
-master$email %<>%
-  tolower()
-
-master %<>%
-  data.table %>% 
-  .[(subject=="DRAM" & course=="400"), name := str_sub(name, 10, str_length(name))] %>% 
-  tbl_df()
-
-
-
-
-
-  

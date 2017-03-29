@@ -1,0 +1,934 @@
+---
+title: "HEQCO Learning Outcomes Project: `r params$dept_title`"
+author: "Jake Kaupp"
+date: "`r Sys.Date()`"
+output: rmarkdown::tufte_handout
+params:
+  dept:
+    value: DRAM
+  dept_title:
+    value: Department of Drama
+---
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+library(ggthemes)
+library(knitr)
+library(viridis)
+library(stringr)
+library(scales)
+library(gridExtra)
+library(corrr)
+library(tidyverse)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+```{r p_select}
+
+p_select <- switch(params$dept, ECE = c("CMPE", "ELEC", "ENGR") ,
+                                CHEE = c("CHEE", "ENCH", "ENGR"),
+                                CIVL = c("CIVL", "ENGR"),
+                                MECH = c("MECH", "ENGR"),
+                                ENPH = c("ENPH", "ENGR"),
+                                MINE = c("MINE", "ENGR"),
+                                MTHE = c("MTHE", "ENGR"),
+                                GEOE = c("GEOE", "ENGR"),
+                   params$dept)
+
+```
+
+
+```{r data}
+
+LOAC <- RSQLServer::src_sqlserver("FEAS", database = "HEQCO-LOAC")
+
+if (length(p_select) > 1)  {
+  
+  expr_1 <- map(paste0(p_select, "%"), ~sql(paste0("acad_plan %like% ", shQuote(.x))))
+ 
+   expr_2 <- build_sql("subject %in% c", p_select)
+    
+  expr <- sql_vector(c(expr_1, expr_2), collapse = "|", parens = FALSE)
+  
+} else {
+  
+  expr_1 <- sql(paste0("acad_plan %like% ", shQuote(p_select)))
+ 
+  expr_2 <- build_sql("subject ==", p_select)
+  
+  expr <- sql_vector(c(expr_1, expr_2), collapse = "|", parens = FALSE)
+}
+  
+student_info <- LOAC %>%
+  dplyr::tbl("student_info") %>% 
+  dplyr::filter_(.dots = expr ) %>% 
+  dplyr::filter(!(term %in% c(2141,2139) & semester %in% c(7,8))) %>% 
+  dplyr::collect()
+
+
+```
+
+```{r processing}
+
+cla_plus <- LOAC %>% 
+  dplyr::tbl("cla_plus") %>% 
+  dplyr::collect() %>% 
+  dplyr::left_join(student_info,., by = c("term", "studentid")) %>% 
+  dplyr::filter_(~!is.na(test_date)) %>% 
+  mutate(year = case_when(semester %in% c(1,2) ~ 1,
+                         semester %in% c(3,4) ~ 2,
+                         semester %in% c(5,6) ~ 3,
+                         semester %in% c(7,8) ~ 4)) 
+cat <- LOAC %>%
+  dplyr::tbl("cat") %>% 
+  dplyr::collect() %>% 
+  dplyr::left_join(student_info,., by = c("term", "studentid")) %>% 
+  dplyr::filter_(~!is.na(loc_code)) %>% 
+  mutate(year = case_when(semester %in% c(1,2) ~ 1,
+                         semester %in% c(3,4) ~ 2,
+                         semester %in% c(5,6) ~ 3,
+                         semester %in% c(7,8) ~ 4))
+
+value <- LOAC %>%
+  dplyr::tbl("value") %>% 
+  dplyr::collect() %>% 
+  dplyr::left_join(student_info,., by = c("term", "studentid", "subject")) %>% 
+  dplyr::filter_(~!is.na(artifact)) %>% 
+  mutate(year = case_when(semester %in% c(1,2) ~ 1,
+                         semester %in% c(3,4) ~ 2,
+                         semester %in% c(5,6) ~ 3,
+                         semester %in% c(7,8) ~ 4)) 
+
+tlo <- LOAC %>%
+  dplyr::tbl("tlo") %>% 
+  dplyr::collect() %>% 
+  dplyr::left_join(student_info,., by = c("term", "studentid")) %>% 
+  dplyr::filter_(~!is.na(collector)) %>% 
+  mutate(year = case_when(semester %in% c(1,2) ~ 1,
+                         semester %in% c(3,4) ~ 2,
+                         semester %in% c(5,6) ~ 3,
+                         semester %in% c(7,8) ~ 4))
+
+```
+
+\vspace{40 mm}
+
+\newthought{The Higher Education Quality Council}[^heqco], created a consortium of three Universities and thee Colleges in Ontario, and tasked them with determining methods for assessing broad, high-level learning outcomes across an institution.  The Queen's Learning Outcomes Project[^qlop], is a four-year longitudinal study that is looking at methods to assess cognitive skills, such as Critical Thinking, Problem Solving, Written Communication and Lifelong Learning, in the Faculty of Arts and Science and the Faculty of Engineering and Applied Science.  There are a number of participating departments in both Faculties:
+
+* Department of Drama
+* Department of Psychology
+* Department of Physics
+* All 8 Departments in the Faculty of Engineering and Applied Science.
+
+The project tracks the 2013-2014 cohort of students as they progress through their undergraduate experience at Queen's, to investigate how students develop these skills over the duration of their undegradaute education and to determine the efficacy, efficiency and sustainability of each assessment method. 
+
+The results from the project offer a means of triangulating results from other assessment instruments, such as the National Survey of Student Engagement or Queen's Graduate Exit Survey, and offer evidence towards demonstrating student performance in CEAB's graduate attributes or the Council of Ontario Universities Degree Level Expectations.  This document presents a brief summary of each of the instruments, and a summary of the results for the `r params$dept_title`.
+
+\newpage
+
+# Assessment Tools
+
+The Queen's Learning Outcomes Project is using four tools to assess cognitive skills:
+
+* Standarized Instruments (The Collegiate Learning Assessment Plus and the Critical Thinking Assessment Test)
+* Program level meta-rubrics (The Valid Assessment of Learning in Undergradate Education or VALUE Rubrics)
+* Qualitiative Surveys (The Transferrable Learning Orientations Survey)
+
+## The Collegiate Learning Assessment Plus (CLA+)[^cla+] 
+
+The CLA+ is a 90 minute, standardized test that students take online.  The CLA+ is divided into two main tasks, each which are designed to measure a specific skills and abilities.  The first is a Performance task, in which students are placed in a scenario and are given a library of evidence.  They are asked to thoroughly read the evidence and then prepare their reponse for the scenario, which often has them support or refute a position or provide recommendations for potential action.  The second section of the CLA+ is a series of Selected-response questions, in which students are presented with a prompt and then asked to select a suitable respons from the options provided.  The questions ask students to evaluate claims, critique arguments, and interpret information. 
+
+## Interpreting CLA+ Scores
+The instrument is machine-scored, supplemented and checked by expert raters.  The results are presented as a set of absolute criterion referenced scores and subscores as well as a set of norm-referenced Mastery levels[^mastery].\marginnote{\textbf{Criterion-referenced} refers to tests and assessments  designed to measure student performance against a fixed set of predetermined criteria or learning standards.}
+
+\marginnote{\textbf{Norm-referenced} refers to standardized tests that are designed to compare and rank test takers in relation to one another.}
+
+To better understand how to interpret the scores, consider the following.  Think of the absolute scores (Total Score, Performance Task Score, Selected Response Score) as the comparitive measure of the student to use their skills in concert, in a realistic setting.  The Mastery levels describe the characteristics and abilities, while the sub-scale scores measure how well the student performs in each specific skill.  You can have a student display excellent analytical reasoning and problem sovling, but poor written communication.  This would be reflected by a high sub-scale score for analytical reasoning, poor for writing mechanics and effectiveness; producing a moderate Performance Task Score and lowering the overall total score.  
+
+
+# The Critical Thinking Assessment Test (CAT Test)[^cat]
+
+The Critical Thinking Assessment Test (CAT) is a 60 minute, paper test that was collaboratively developed by Tennessee Technological University (TTU) and faculty from participating institutions. The primary goal of this collaboration was to develop a faculty-driven assessment tool to engage the faculty in meaningful, authentic assessment with the goal of improving student learning. The CAT assesses a consensus core set of five skills that address elements of critical thinking, problem solving, and communication across a variety of disciplines. 
+
+The CAT consists of 15 questions requiring both quick response items (multiple choice, binary scale) and short answer essay responses that are likely to measure both the cognitive elements of critical thinking as well as the disposition of students to actually engage in critical thinking. 
+
+## Interpreting CAT Scores
+The CAT test is collaboratively scored by a group of trained raters, with the creators of the test endorsing a 'train-the-trainer' system following a detailed scoring guide.  While the creators of the test encourage faculty-led scoring sessions, to help faculty better understand the strenghts and weakeness of their students, all scoring sesssions at Queen's were conducted by expertly trained upper-year students.
+\marginnote{In both the CAT and CLA+ the solitary scores are important, but the difference measured over time of greater value.}
+The CAT scores are provided on a criterion referenced absolute scale, with a maximum possible score of 38.  Solitary scores are best interpreted holistically, with higher scores indicating a student that has a greater command of these skills and applies them in concert.  
+
+# The Valid Assessment of Learning in Undergraduate Education (VALUE) Rubrics[^value]
+
+Developed by the American Association of Colleges and Universities to provide a valid assessment of learning in undergraduate education.  These rubrics are broad, discipline-neutral descriptions of selected essential learning outcomes of undergraduate education from the Liberal Education America’s Promise (LEAP) initiative.  In each rubric, common themes were identified for each outcome and performance criteria were developed by panels of experts. The efforts of the experts were focused on:
+
+* Performance criteria focuses on positive demonstration of outcomes rather than what was lacking
+* Performance criteria can be used to assess to non-traditional modes of artefacts demonstrating student learning
+* Performance criteria are developed to assess summative displays of student learning rather than developmental or formative displays
+* Performance criteria are phrased in a manner as to be easily understood by non-experts
+
+There are four levels of performance criteria, from the benchmark level of a student entering university to the capstone level of a student who has just completed their undergraduate experience.   While the performance criteria and levels represent a consensus of experts and can be used in their original form, the rubrics are purposely designed for modification to foster alignment between course, program or institutional outcomes and to reflect the specific context in which they are used. 
+
+## Interpreting the VALUE Rubrics
+
+The results illustrate the respective strengths and weaknesses of the cohort, measured through the evaluation of signature assessments from each year of the program.   \marginnote{While the results are measuring student performance, the assessment task can significantly influence the results. Assessments that are misaligned, or do not offer students the chance to display certain skills will bias results.} The assessents used in this project are deliverables from first and second year courses, these artifacts were selected in consultation with instructors and were thought to be the ones most suited for students to demonstrate the skills being assessed.  The results from the VALUE Rubrics are meant to be interpreted at the cohort level, which represents a certain demographic of a program or institution.  They are best viewed on a continumn, rather than an objective ranking or quantification of student ability.  In a way the results of the VALUE Rubrics can also be used to see how well an assessment task is suited for the development and assesment of essential learning outcomes.
+
+
+# The Transferrable Learning Orientations Survey[^tlo]
+
+The Transferrable Learning Orientations Survey (TLO) is a triangulated measure developed as an ongoing self-report measure of lifelong learning. It was built on select scales from the Motivated Strategies for Learning Questionnaire (MSLQ), together with multiple choice items adapted from the Association for American Colleges and Universities Lifelong Learning rubric, and an open-ended response for each dimension. The survey has three overarching factors, deep learning, self-belief, and learning strategies. The open-ended questions are designed to support meta-cognition; to engage students in thinking about their own learning.
+
+The TLO was designed as a triangulated measure using a quantitative pairing of four scale items for each construct, correlated to a holistic rubric self-rating, with an open-ended response used for the purpose of feedback to the instructor and validation of final rating. The final levels are reported on a scale from one to four.  \marginnote{A score of one describes surface level engagement, fixed mindset, limited confidence and lack of organization, whereas four describes a deep learner, flexible mindset, confident, and high level of organization.}The 4 scale items are averaged and compared to the students self-rating on the rubric.  These two individual ratings are quite close, and may reflect students "true" and "ideal" self.  The open-ended resposnes then can be used to investigate differences and detemine which rating is more applicable. 
+
+## Interpreting the Transferrable Learning Orientations Survey
+
+The TLO self-report measure is not expected to represent a summative point for transferable, but rather part of an ongoing process.  The TLO is intended to be used as a self-assessment; administered before and after a course of study to determine if teaching and learning had an impact on approaches to lifelong learning. The TLO accomplishes this by asking students to think back over their past year and frame their responses in that fashion.  Interpreting TLO results at the program level can provide insight into how aspects of the program already support students in these aspects, how programming can be developed to better support students, and the student voice as to how the curriculum is shaping their approach towards learning.
+
+\newpage
+
+# Results
+
+## CLA + Results
+
+```{r cla_stats, echo = FALSE}
+cla_cont <- cla_plus %>% 
+  filter(!is.na(score_total)) %>% 
+  group_by(studentid) %>% 
+  filter(n() >1) %>%
+  ungroup %>% 
+  n_distinct()/2
+
+years <- unique(cla_plus[["year"]])
+  
+```
+
+## Absolute Scores
+Presented below are the combined results for the `r params$dept_title`.\marginnote{The average CLA+ score for a graduating senior from an american institution in 2013-2014 was 1128.}  First is the overall CLA+ score, which presents an indicator of the overall ability of students at each year, as well as the growth that occurs between years in the program. The number students taking the test by year of study are shown in the table below.  
+
+```{r cla_table}
+cla_plus %>% 
+ count(year, semester, term) %>%
+ ungroup %>% 
+ select(year, n) %>% 
+ mutate(year = factor(year, c(1:4), c("2013-2014","2014-2015","2015-2016","2016-2018"))) %>% 
+ kable()
+```
+
+Of that group, there were `r cla_cont` students that took the test in both years. In the chart below, each student that took the CLA+ in consecutive years is plotted as a grey line connecting their score in each year.  The blue line represents the mean score, represented by the corhort mean by year of study.
+
+```{r CLA_total, fig.width = 12, fig.height = 6, fig.cap = paste0(params$dept_title, ": CLA+ Total Score"), fig.fullwidth = TRUE}
+
+if (length(years) > 1) {
+
+min <- min(cla_plus[["year"]])
+max <- max(cla_plus[["year"]])
+
+ggplot(cla_plus, aes(x = year, y = score_total)) +
+  geom_line(aes(group = studentid), alpha = 0.2) +
+  stat_summary(aes(group = 1), size = 1, color = "blue" ,geom = "line", fun.y = "mean", na.rm = TRUE) +
+  stat_summary(aes(label = floor(..y..)), fun.y = "mean", geom = "text", color = "blue", size = 4, vjust = -0.5, na.rm = TRUE) +
+  geom_rug(sides = "l", alpha = 0.2, data = filter(cla_plus, semester == min_rank(year))) +
+  geom_rug(sides = "r", alpha = 0.2, data = filter(cla_plus, min_rank(semester) == max(min_rank(semester)))) +
+  geom_rangeframe() +
+  scale_x_continuous(breaks = c(1,2,3,4), labels = c("2013-2014","2014-2015","2015-2016","2016-2017") ) +
+  expand_limits(x = c((min-0.1),(max+0.1))) +
+  ylab("CLA+ Score") +
+  xlab("Year") +
+  theme_tufte(base_size = 16) +
+  theme(axis.title.y = element_text(angle = 0)) 
+} else {
+  
+  ggplot(cla_plus, aes(x = score_total, y = 1)) +
+    geom_point() +
+    geom_vline(aes(xintercept = mean(score_total, na.rm = TRUE)), color = "blue") +
+    geom_label(aes(y = 1.01, x = mean(score_total, na.rm = TRUE), label = trunc(mean(score_total, na.rm = TRUE))), color = "blue") +
+    geom_rangeframe() + 
+    scale_y_continuous(breaks = c(1,2,3,4), labels = c("2013-2014","2014-2015","2015-2016","2016-2017")) +
+    expand_limits(y = c(0.9,1.1)) +
+    xlab("CLA+ Score") +
+    ylab("Year") +
+    theme_tufte(base_size = 16) +
+    theme(axis.title.y = element_text(angle = 0),
+          panel.grid.major.x = element_line(colour = "grey80")) 
+   
+  
+}
+
+  
+  
+```
+
+\newpage
+
+## Mastery Levels
+Alternatively, the results can also be viewed by looking at the distribution of mastery levels at each year, illustrated below in histograms by each year. 
+```{r CLA_Mastery, fig.width = 10, fig.height = 5, fig.cap = "CLA+ Mastery Score Distribution",  fig.fullwidth = TRUE}
+plot_data <- cla_plus %>% 
+  filter(!is.na(mastery)) %>% 
+  count(year, mastery)
+  
+ggplot(plot_data, aes(x = mastery, y = n)) +
+      geom_col(fill = "grey50",  width = 0.5) +
+      geom_text(aes(label = n), nudge_y = 5) +
+      scale_x_discrete(labels = function(x) stringr::str_wrap(x, width = 5), limits = c("Below Basic", "Basic", "Proficient", "Acomplished", "Advanced")) +
+      scale_y_continuous(breaks = pretty_breaks()) +
+      facet_wrap(~year, labeller = labeller(year = setNames(c("2013-2014", "2014-2015","2015-2016","2016-2107"), c(1,2,3,4)))) +
+      ylab("Count") +
+      xlab("\nMastery Level") +
+      theme_tufte(base_size = 16, ticks = F) +
+      theme(axis.title.y = element_text(angle = 0),
+            panel.grid.major.y = element_line(colour = "grey80"))
+
+```
+
+## Confounding Factors
+There are variety of factors that influence student performance on the CLA+.  This test was embedded within a course, but their performance on the test did not affect their course grades.  They were simply taking the test for participation credit.  This does introduce questions regarding the effort students put into the test, and their scores not reflecting their true ability if they don't put full effort into the test.  There are noted correlations between scores, effort and time on task, shown in the correlation heatmap on the next page.
+
+\newpage
+
+```{r Correlations, fig.width = 12, fig.height = 8,fig.cap = "Effort, Time and Score Correlations"}
+
+cor <- cla_plus %>% 
+  select(year, score_total, score_pt, score_sr, effort_pt, effort_sr, time_pt, time_sr) %>%
+  group_by(year) %>%
+  nest() %>% 
+  mutate(cor = map(data,~correlate(.x, use = "complete.obs"))) %>% 
+  mutate(cor = map(cor, rearrange)) %>% 
+  mutate(cor = map(cor, stretch)) %>% 
+  unnest(cor) 
+
+ggplot(cor, aes(x = x, y = y)) +
+  geom_tile(aes(fill = r), color = "white") +
+  facet_wrap(~year, labeller = labeller(year = setNames(c("2013-2014", "2014-2015","2015-2016","2016-2017"), c(1,2,3,4)))) +
+  ylab("") +
+  xlab("\nCLA+ Varibles: Score, Effort and Time") +
+  coord_equal(ratio = 1) +
+  scale_fill_gradientn("Pearon's r", colors = wesanderson::wes_palette("Zissou", 5), limits = c(-1,1), na.value = "white", breaks = seq(-1,1, by = 0.2)) +
+  #scale_fill_viridis("Pearson's r", option = "viridis", na.value = "white", limits = c(-1,1)) +
+  theme_tufte(base_size = 18) +
+  theme(legend.position = "bottom",
+        legend.key.width = unit(2, "cm"))
+
+```
+
+The CLA+ does address this by measuring effort and time on task, which allows for some measure of control and interpretation of score, the results of which are shown below.  It should be noted that there is a difference in time allotted to tasks, with 60 minutes alloted to the performance task and 30 minutes alloted to the selected response questions. 
+
+```{r effort, fig.cap = "Self-reported Effort on Task", fig.width = 10, fig.height = 6}
+
+plot_data <- cla_plus %>% 
+  select(year, effort_pt, effort_sr) %>% 
+  gather(task, value, -year, na.rm = TRUE)
+
+ggplot(plot_data, aes(x = value)) +
+  geom_bar(aes(fill = factor(year)), position = position_dodge()) +
+  xlab("Self-reported\nEffort\n") +
+  ylab("\nCount") +
+  scale_y_continuous(breaks = pretty_breaks()) +
+  coord_flip() + 
+  facet_grid(year~task, labeller = labeller(task = setNames(c("Performance Task", "Selected Response Items"), c("effort_pt","effort_sr")),
+                                            year = setNames(c("2013-2014", "2014-2015","2015-2016","2016-2017"), c(1,2,3,4)))) +
+  theme_tufte(base_size = 20) +
+  theme(legend.position = "none",
+        panel.grid.major.x = element_line(colour = "grey80"),
+        strip.text.x = element_text(angle = 0),
+        axis.title.y = element_text(angle = 0),
+        strip.text.y = element_text(angle = 0)) +
+  scale_fill_grey() 
+```
+
+```{r time,fig.cap = "Time on Task", fig.width = 10, fig.height = 6}
+
+plot_data <- cla_plus %>% 
+  select(year, time_pt, time_sr) %>% 
+  gather(task, value, -year, na.rm = TRUE) 
+
+summary <- plot_data %>% 
+  group_by(year, task) %>% 
+  summarize(mean = mean(value, na.rm = TRUE))
+
+ggplot(plot_data, aes(x = value)) +
+  geom_density(aes(fill = task), position = position_dodge(), alpha=0.5) +
+  geom_vline(aes(xintercept = mean), color = "red", data = summary, size = 0.5, linetype = "dashed") +
+  xlab("\nTime on Task") +
+  ylab("Density \n") +
+  facet_grid(year~task, labeller = labeller(task = setNames(c("Performance Task", "Selected Response Items"), c("time_pt","time_sr")),
+                                            year = setNames(c("2013-2014", "2014-2015","2015-2016","2016-2017"), c(1,2,3,4)))) +
+  theme_tufte(base_size = 20) +
+  scale_x_continuous(breaks = scales::pretty_breaks()) +
+  theme(legend.position = "none",
+         strip.text.y = element_text(angle = 0)) +
+  scale_fill_grey(labels = c("Performance Task", "Selected Response Questions"))
+```
+
+\newpage
+
+## Performance Task & Selected Response Scores
+The total score is comprised of the scores from the two tasks: the performance task and the selected response questions.  The scores from each represent how well students perform on each task, presented on an absoulte scale, similar to the total score of the CLA+.  The results are presented below as a line graph to illustrate increases or decreases over time.  The blue line and numbers illustrate the mean score.
+```{r PT_SR_Scores, fig.width = 16, fig.height = 7,  fig.cap = paste0(params$dept_title, ": CLA+ PT and SR Scores"),  fig.fullwidth = TRUE}
+
+if (length(years) > 1) {
+
+plot_data <- cla_plus %>% 
+  select(studentid,year,score_pt,score_sr) %>% 
+  gather(task, score, -studentid, -year, na.rm = TRUE)
+
+summary <- plot_data %>% 
+  group_by(task, year) %>% 
+  summarize_each(funs(mean(., na.rm = TRUE)), -studentid, -task)  %>% 
+  mutate_each(funs(floor), -task) %>% 
+  ungroup
+
+min <- plyr::round_any(min(plot_data[["score"]]), 100, floor)
+
+max <- plyr::round_any(max(plot_data[["score"]]), 100, ceiling)
+ 
+ggplot(plot_data) +
+  geom_line(aes(group = studentid, x = year, y = score), alpha = 0.2) +
+  geom_line(aes(x = year, y = score, group = task), color = "blue", size = 1, data = summary) +
+  geom_text(aes(x = year - 0.1, y = score, label = score), color = "blue", fontface = "bold", data = filter(summary, year == min_rank(year))) +
+  geom_text(aes(x = year + 0.1, y = score, label = score), color = "blue", fontface = "bold", data = filter(summary, min_rank(year) == max(min_rank(year)))) +
+  geom_rug(aes(x = year, y = score, group = studentid), sides = "l", alpha = 0.2, data = filter(plot_data, year == min_rank(year), task == "score_pt")) +
+  geom_rug(aes(x = year, y = score, group = studentid), sides = "r", alpha = 0.2, data = filter(plot_data, min_rank(year) == max(min_rank(year)), task == "score_pt")) +
+  geom_rug(aes(x = year, y = score, group = studentid), sides = "l", alpha = 0.2, data = filter(plot_data, year == min_rank(year), task == "score_sr")) +
+  geom_rug(aes(x = year, y = score, group = studentid), sides = "r", alpha = 0.2, data = filter(plot_data, min_rank(year) == max(min_rank(year)), task == "score_sr")) +
+  xlab("\nProject Year") +
+  ylab(stringr::str_wrap("Absolute Score",5)) +
+  facet_wrap(~task, labeller = labeller(task = setNames(c("Performance Task", "Selected Response Questions"), c("score_pt","score_sr")))) +
+  scale_x_continuous(breaks = c(1,2,3,4), labels = c("2013-2014","2014-2015","2015-2016","2016-2017")) +
+  scale_y_continuous(limits = c(min, max)) +
+  expand_limits(x = c(0.8,2.2)) +
+  geom_rangeframe() +
+  theme_tufte(base_size = 20) +
+  theme(legend.position = "none",
+        axis.title.y = element_text(angle = 0),
+        axis.ticks.x = element_blank(),
+        strip.text.y = element_text(angle = 0))  
+} else {
+  
+  ggplot(plot_data, aes(x = score, y = year)) +
+    geom_point() +
+    geom_vline(aes(xintercept = score), color = "blue", data = summary) +
+    geom_label(aes(y = 1.01, x = score, label = score), color = "blue", data = summary) +
+    facet_wrap(~task, labeller = labeller(task = setNames(c("Performance Task", "Selected Response Questions"), c("score_pt", "score_sr")))) +
+    geom_rangeframe() + 
+    scale_y_continuous(breaks = c(1,2,3,4), labels = c("2013-2014","2014-2015","2015-2016","2016-2017")) +
+    expand_limits(y = c(0.9,1.1)) +
+    xlab("CLA+ Score") +
+    ylab("Year") +
+    theme_tufte(base_size = 16) +
+    theme(axis.title.y = element_text(angle = 0),
+          panel.grid.major.x = element_line(colour = "grey80")) 
+  
+}
+
+
+
+```
+
+\pagebreak
+
+## Sub-scale Scores
+Within each of these tasks, students are also evaluated on how well they display distinct skills.  Each task assesses different skills, and in a different manner. The performance task assesses, using a 6 levelled analytic rubric[^clarubric]:
+
+* Analytical Reasoning and Problem Solving
+* Writing Mechanics
+* Writing Effectiveness
+
+The results are presented below as horizontal histograms, allowing the comparison of distrbutions over time.
+
+```{r PT_Subscores, fig.width = 10, fig.height = 6,  fig.cap = paste0(params$dept_title, ": CLA+ PT Sub-scale Scores"),  fig.fullwidth = TRUE}
+
+plot_data <- cla_plus %>% 
+  select(year, pt_aps, pt_wm, pt_we) %>% 
+  gather(task, score, pt_aps:pt_we, na.rm = TRUE) %>% 
+  count(year, task, score) %>% 
+  complete(nesting(year, task), score = c(1:6), fill = list(n = 0))
+  
+ggplot(plot_data, aes(x = score, y = n )) +
+   geom_col(aes(fill = task), color = "white", position = position_dodge(), width = 1) +
+   coord_flip() +
+   xlab("Rubric Level\n") +
+   ylab("\nCount") +
+   facet_grid(task ~ year, labeller = labeller(task = setNames(stringr::str_wrap(c("Analytical Reasoning & Problem Solving", "Writing Mechanics", "Writing Effectiveness"), 10), c("pt_aps","pt_we","pt_wm")),
+                                               year = setNames(c("2013-2014", "2014-2015","2015-2016","2016-2017"), c(1,2,3,4)))) +
+   theme_tufte(base_size = 16) +
+   scale_x_continuous(breaks = c(1,2,3,4,5,6), labels = c(1,2,3,4,5,6)) +
+   scale_y_continuous(breaks = pretty_breaks()) +
+   theme(legend.position = "none",
+         panel.grid.major.x = element_line(colour = "grey80"),
+         strip.text.y = element_text(angle = 0),
+         axis.title.y = element_text(angle = 0)) +
+   scale_fill_grey() 
+
+```
+\newpage
+While the Selected Response Questions assesses, using an criterion referenced absolute scale:
+
+* Scientific and Quantitative Reasoning
+* Critical Reading and Evaluation
+* Critiquing an Argument
+
+The results are presented below as a line graph to illustrate increases or decreases over time.  The blue line and numbers illustrates the mean score.
+```{r SR_Subscores, fig.width = 12, fig.height = 6,  fig.cap = paste0(params$dept_title, ": CLA+ SR Sub-scale Scores"),  fig.fullwidth = TRUE}
+
+
+
+plot_data <- cla_plus %>% 
+  select(studentid, year,sr_sqr, sr_ca, sr_cre) %>% 
+  gather(task, score, -studentid, -year, na.rm = TRUE)
+
+summary <- plot_data %>% 
+  group_by(task, year) %>% 
+  summarize_each(funs(mean(., na.rm = TRUE)), -studentid, -task)  %>% 
+  mutate_each(funs(floor), -task) %>% 
+  ungroup
+
+if (length(years) > 1) {
+
+min <- plyr::round_any(min(plot_data[["score"]]), 100, floor)
+
+max <- plyr::round_any(max(plot_data[["score"]]), 100, ceiling)
+ 
+
+ggplot(plot_data) +
+  geom_line(aes(group = studentid, x = year, y = score), alpha = 0.2) +
+  geom_line(aes(x = year, y = score, group = task), color = "blue", size = 1, data = summary) +
+  geom_text(aes(x = year - 0.1, y = score, label = score), color = "blue", fontface = "bold", data = filter(summary, year == min_rank(year))) +
+  geom_text(aes(x = year + 0.1, y = score, label = score), color = "blue", fontface = "bold", data = filter(summary, min_rank(year) == max(min_rank(year)))) +
+  geom_rug(aes(x = year, y = score, group = studentid), sides = "l", alpha = 0.2, data = filter(plot_data, year == min_rank(year), task == "sr_sqr")) +
+  geom_rug(aes(x = year, y = score, group = studentid), sides = "r", alpha = 0.2, data = filter(plot_data, min_rank(year) == max(min_rank(year)), task == "sr_sqr")) +
+  geom_rug(aes(x = year, y = score, group = studentid), sides = "l", alpha = 0.2, data = filter(plot_data, year == min_rank(year), task == "sr_ca")) +
+  geom_rug(aes(x = year, y = score, group = studentid), sides = "r", alpha = 0.2, data = filter(plot_data, min_rank(year) == max(min_rank(year)), task == "sr_ca")) +
+  geom_rug(aes(x = year, y = score, group = studentid), sides = "l", alpha = 0.2, data = filter(plot_data, year == min_rank(year), task == "sr_cre")) +
+  geom_rug(aes(x = year, y = score, group = studentid), sides = "r", alpha = 0.2, data = filter(plot_data, min_rank(year) == max(min_rank(year)), task == "sr_scre")) +
+  xlab("\nProject Year") +
+  ylab(stringr::str_wrap("Absolute Score",5)) +
+  facet_wrap(~task, labeller = labeller(task = setNames(c("Scientific & Quantitative Reasoning", "Critique an Argument", "Critical Reading & Evaluation"), c("sr_sqr","sr_ca","sr_cre")))) +
+  scale_x_continuous(breaks = c(1,2,3,4), labels = c("2013-2014","2014-2015","2015-2016","2016-2017")) +
+  scale_y_continuous(limits = c(min, max)) +
+  expand_limits(x = c(0.8,2.2)) +
+  geom_rangeframe() +
+  theme_tufte(base_size = 20) +
+  theme(legend.position = "none",
+        axis.title.y = element_text(angle = 0),
+        axis.ticks.x = element_blank(),
+        strip.text.y = element_text(angle = 0)) 
+} else {
+          
+  ggplot(plot_data, aes(x = score, y = year)) +
+    geom_point() +
+    geom_vline(aes(xintercept = score), color = "blue", data = summary) +
+    geom_label(aes(y = 1.01, x = score, label = score), color = "blue", data = summary) +
+    facet_wrap(~task, labeller = labeller(task = setNames(c("Scientific & Quantitative Reasoning", "Critique an Argument", "Critical Reading & Evaluation"), c("sr_sqr","sr_ca","sr_cre")))) +
+    geom_rangeframe() + 
+    scale_y_continuous(breaks = c(1,2,3,4), labels = c("2013-2014","2014-2015","2015-2016","2016-2017")) +
+    expand_limits(y = c(0.9,1.1)) +
+    xlab("CLA+ Score") +
+    ylab("Year") +
+    theme_tufte(base_size = 16) +
+    theme(axis.title.y = element_text(angle = 0),
+          panel.grid.major.x = element_line(colour = "grey80"))     
+          
+        }
+
+
+```
+
+\newpage
+
+## Critical Thinking Assessment (CAT) Test Results
+
+## Overall Score
+As previously stated, the CAT assesses a consensus core set of five skills that address elements of critical thinking, problem solving, and communication across a variety of disciplines. The test only reports a single score on an asbolute scale, which repsents a holistic measurment of the students command and demonstration of these skills in concert.  The results are presented as a line to illustrate student development over time where possible.  In the event of only a single year being available, a histogram of scores are presented.  Blue values indicate the mean.
+
+```{r CAT_scores, fig.width = 10, fig.height = 6,  fig.cap = paste0(params$dept_title, ": CAT Scores"),  fig.fullwidth = TRUE}
+
+
+if (nrow(count(cat, year)) < 2)
+{
+  
+  plot_data <- cat %>% 
+    select(studentid, year, score_f) 
+  
+  summary <- plot_data %>% 
+    group_by(year) %>% 
+    summarize(score = mean(score_f, na.rm = TRUE))
+  
+  ggplot(plot_data, aes(x = trunc(score_f))) +
+    geom_density(aes(fill = year)) +
+    geom_vline(data = summary, aes(xintercept = score), color = "red") +
+    geom_label(data = summary, aes(x = score, y = 0.1, label = trunc(score)), color = "red", nudge_y = -0.01) +
+    expand_limits(y = c(0, 0.1)) +
+    coord_flip() +
+    xlab("\nCAT Score") +
+    ylab("Counts") +
+    facet_wrap(~year) +
+    theme_tufte(base_size = 16) +
+    theme(legend.position = "none",
+          axis.title.y = element_text(angle = 0),
+          strip.text.y = element_text(angle = 0))
+  
+} else {
+       
+  plot_data <- cat %>% 
+    select(studentid, year, score_f) %>% 
+    mutate(score = trunc(score_f))
+  
+  summary <- plot_data %>% 
+    group_by(year) %>% 
+    summarize(score = floor(mean(score, na.rm = TRUE)),
+              n = n())
+  
+  n_year <- n_distinct(plot_data$year)
+  
+  limits <- c(1,n_year)
+  breaks <- c(1:n_year)
+  labels <- c("2013-2014","2014-2015","2015-2016","2016-2017")[c(1:n_year)]
+  
+  ggplot(plot_data, aes(x = year, y = score)) +
+    geom_line(aes(group = studentid, x = year, y = score), alpha = 0.2) +
+    geom_path(aes(group = 1, y = score), color = "blue", data = summary) +
+    geom_point(aes(group = studentid), shape = 21, color = "white", fill = "black") +
+    geom_point(shape = 21, color = "white", fill = "blue", data = summary) +
+    geom_text(aes(x = year, y = 5, label = sprintf("n = %s", n)), data = summary) +
+    scale_x_continuous(limits = limits, breaks = breaks, labels = labels) +
+    scale_y_continuous(breaks = pretty_breaks()) +
+    xlab("\nProject Year") +
+    ylab("CAT Score") +
+    theme_tufte(base_size = 16) +
+    geom_rangeframe() +
+    theme(
+      legend.position = "none",
+      axis.title.y = element_text(angle = 0),
+      axis.ticks.y = element_blank(),
+      axis.ticks.x = element_blank(),
+      strip.text.y = element_text(angle = 0))
+        }
+        
+```
+
+## Confounding Factors
+Similar to the CLA, there are many reasons that influence student performance.\marginnote{During the first two years of the project, only a single form of the CAT existed, so students would repeat the exact task as they did in the previous years.  This can increase test fatigue, which can negatively effect student motivation.}  This test was embedded within a course, but their performance on the test did not affect their course grades.  They were simply taking the test for participation credit.  This introduces questions regarding the effort students put into the test, and their motivation.  
+
+\newpage
+
+## VALUE Rubric Results
+
+The VALUE Rubrics were used to assess artifacts drawn from courses in the first two years of the program. The specific courses were selected as they represented courses from the `r params$dept_title` that would naturally provide students with the opportunity to exhibit Critical Thinking, Problem Solving and Written Communication.  Each of these artifacts also represent summative displays of student performance. 
+
+```{r VALUE_artifacts}
+
+value %>% 
+   distinct(year, semester, subject, course.y, artifact) %>% 
+   unite(course_code, subject, course.y, sep = " ") %>% 
+   mutate(year = factor(year,c(1,2,3,4), c("2013-2014","2014-2015","2015-2016","2016-2017")),
+          semester = ifelse(semester %% 2 == 0 , "Winter", "Fall")) %>%  
+  arrange(year, semester) %>% 
+  rename(Year = year,
+         Course = course_code,
+         Semester = semester,
+         Artifact = artifact) %>% 
+  kable
+```
+
+In order to have the data reflect the abiities of students accurately, we have presented the time frame of each year by semester.  For the `r params$dept_title`, the APSC 200 offering was during the Fall Semester of the second year of the study (and studetns progress through the program).  All of the artifacts assessed were group submissions.  This means that each member of the group received the same score as the others, as there was no way to distinguish individual contributions from the group report.
+
+\newpage
+
+## Overall VALUE Rubric Performance
+
+The results are presented as a slopegraph, a chart which is used compare changes over time for categorical data located on an ordinal or interval scale.  Note that within categories the scale is relative, to depict trends within each category and readily compare it to another.  These results give an overal sense of how students are progressing in these skills within a year, and as they progress through the programs.  
+
+The numbers presented in the graph represent the mean performance of students on critical thinking, problem solving and written communication, by the process below: 
+
+1. Convert ordinal ranking to numeric value
+2. Calculate the mean over each sub-scale (row of the rubric)
+3. Calculate the mean for the `r params$dept_title`
+
+
+```{r VALUE_scores, fig.width = 18, fig.height = 10,  fig.cap = paste0(params$dept_title, ": VALUE Scores"),  fig.fullwidth = TRUE}
+
+plot_data <- value %>% 
+  select(year, semester, studentid, subject, course = course.y, rubric, dimension, level, rater) %>% 
+  group_by(year, semester, studentid, subject, course = course, rubric, dimension) %>% 
+  filter(level != "99") %>% 
+  summarize(level = trunc(mean(as.numeric(level), na.rm = TRUE)))
+  
+summary <- plot_data %>% 
+  group_by(rubric, semester) %>% 
+  summarize(level = mean(level)) %>% 
+  ungroup %>% 
+  arrange(level) 
+
+ limits <- c(min(summary$semester), max(summary$semester))
+ 
+ breaks <- c(min(summary$semester):max(summary$semester))
+ 
+ labels <- sprintf("%s %s", rep(c("Fall","Winter"),4), rep(c("2013-2014","2014-2015","2015-2016", "2016-2017"), each = 2))[c(min(summary$semester):max(summary$semester))]
+
+ggplot(summary, aes(x = semester, y = level)) +
+  geom_hline(yintercept = seq(0,4), color = "grey90", alpha = 0.5) +
+  geom_line(aes(group = "rubric")) +
+  geom_label(aes(label = round(level,1)), fill = "white", color = "white", label.size = 0, size = 6) +
+  geom_text(aes(label = round(level,1)), size = 6) +
+  scale_x_continuous(limits = limits, breaks = breaks, labels = labels) +
+  scale_y_continuous(limits = c(0,4), breaks = c(0:4), labels = c("Below Basic (0)","Basic (1)","Benchmark (2)", "Benchmark (3)", "Capstone (4)")) +
+  facet_wrap(~rubric) +
+  theme_tufte(base_size = 26, ticks = TRUE) + 
+  theme(axis.title = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+\newpage
+## VALUE Rubric Sub-scales
+
+The individual VALUE rubric sub scores reveal the strengths and weakeness of students on the invidual elements that comprise Critical Thinking, Problem Solving or Written Communication.  The results are presented as horizontal histograms, which illustrate positive growth by moving rightward and upward.  
+
+```{r VALUE_subscores, fig.width = 16, fig.height = 15,  fig.cap = paste0(params$dept_title, ": VALUE Rubric Sub Scores"),  fig.fullwidth = TRUE}
+
+
+plot_data <- value %>% 
+  select(year, semester, studentid, subject, course = course.y, rubric, dimension, level, rater) %>% 
+  group_by(year, semester, studentid, subject, course = course, rubric, dimension) %>% 
+  summarize(level = trunc(mean(as.numeric(level), na.rm = TRUE))) %>% 
+  mutate(level = factor(level, c(0, 1, 2, 3, 4, 99), c("Below Benchmark 1", "Benchmark 1", "Milestone 2", "Milestone 3", "Capstone 4", "Not Assessed"))) %>% 
+  mutate(color = ifelse(grepl("Not", level), "firebrick", "grey50"),
+         text = ifelse(grepl("Not", level), "Not Assessed", ""))
+
+not_assessed <- plot_data %>% 
+  ungroup %>% 
+  complete(nesting(semester, subject, course), nesting(rubric, dimension), fill = list(level = "Not Assessed")) %>% 
+  distinct(semester, rubric, dimension, level, .keep_all = FALSE) %>% 
+  filter(grepl("Not", level))
+  
+ limits <- c(min(plot_data$semester), max(plot_data$semester))
+ 
+ breaks <- unique(plot_data$semester)
+ 
+ labels <- stringr::str_wrap(sprintf("%s %s", rep(c("Fall","Winter"),4), rep(c("2013-2014","2014-2015","2015-2016", "2016-2017"), each = 2)),5)[breaks]
+
+ggplot(filter(plot_data, rubric == "Critical Thinking"), aes(x = level)) +
+  geom_bar(fill = "grey50", position = position_dodge(), width = 0.75) +
+  geom_label(aes(x = "Milestone 2", y = 50), size = 6, label = "Not Assessed",label.size = 0, fill = "white", color = "firebrick", data = filter(not_assessed, rubric == "Critical Thinking")) +
+  labs(x = "Level", y = "Count", title = "VALUE Rubric: Critical Thinking") + 
+  facet_grid(dimension ~ semester, labeller = labeller(semester = setNames(labels, breaks),
+                                                       dimension = label_wrap_gen(width = 10))) +
+  theme_tufte(base_size = 20) +
+  coord_flip() +
+  theme(legend.position = "none",
+        panel.grid.major.x = element_line(colour = "grey80"),
+        strip.text.y = element_text(angle = 0),
+        axis.title.y = element_text(angle = 0)) +
+  scale_color_identity() +
+  scale_x_discrete(limits = c("Below Benchmark 1", "Benchmark 1", "Milestone 2", "Milestone 3", "Capstone 4")) +
+  scale_y_continuous(breaks = scales::pretty_breaks())
+
+ggplot(filter(plot_data, rubric == "Problem Solving"), aes(x = level)) +
+  geom_bar(fill = "grey50", position = position_dodge(), width = 0.75) +
+  geom_label(aes(x = "Milestone 2", y = 50), size = 6, label = "Not Assessed", label.size = 0, fill = "white", color = "firebrick", data = filter(not_assessed, rubric == "Problem Solving")) +
+   labs(x = "Level", y = "Count", title = "VALUE Rubric: Problem Solving") + 
+  facet_grid(dimension ~ semester, labeller = labeller(semester = setNames(labels, breaks),
+                                                       dimension = label_wrap_gen(width = 10))) +
+  theme_tufte(base_size = 20) +
+  coord_flip() +
+  theme(legend.position = "none",
+        panel.grid.major.x = element_line(colour = "grey80"),
+        strip.text.y = element_text(angle = 0),
+        axis.title.y = element_text(angle = 0)) +
+  scale_color_identity() +
+  scale_x_discrete(limits = c("Below Benchmark 1", "Benchmark 1", "Milestone 2", "Milestone 3", "Capstone 4")) +
+  scale_y_continuous(breaks = scales::pretty_breaks())
+
+
+ggplot(filter(plot_data, rubric == "Written Communication"), aes(x = level)) +
+  geom_bar(fill = "grey50", position = position_dodge(), width = 0.75) +
+  geom_label(aes(x = "Milestone 2", y = 50), size = 6, label = "Not Assessed", label.size = 0, fill = "white", color = "firebrick", data = filter(not_assessed, rubric == "Written Communication")) +
+  labs(x = "Level", y = "Count", title = "VALUE Rubric: Written Communication") + 
+  facet_grid(dimension ~ semester, labeller = labeller(semester = setNames(labels, breaks),
+                                                       dimension = label_wrap_gen(width = 10))) +
+  theme_tufte(base_size = 20) +
+  coord_flip() +
+  theme(legend.position = "none",
+        panel.grid.major.x = element_line(colour = "grey80"),
+        strip.text.y = element_text(angle = 0),
+        axis.title.y = element_text(angle = 0)) +
+  scale_color_identity() +
+  scale_x_discrete(limits = c("Below Benchmark 1", "Benchmark 1", "Milestone 2", "Milestone 3", "Capstone 4")) +
+  scale_y_continuous(breaks = scales::pretty_breaks())
+
+```
+\newpage
+
+## Confounding Factors
+The VALUE rubrics do not suffer from the same issues that standardized tests do.  The VALUE rubrics are used on artifacts that are already being submitted as part of a course, so student motivation is tied to their course and program completion, rather than a participation mark.  Used in this fashion, they offer a valid, discipline specific and authentic way to assess esssential learning outcomes in students.
+
+However, there are certain issues that one should be aware of:
+
+* The VALUE rubrics are very dependent upon the structure task and its contextual information, that is to say the results can be skewed if the task is not designed in such a way to allow students to demonstrate the outcomes by which they are assessed.  
+* The results are also sensitive to the amount of scaffolding provided within the questions, as some tasks may artificially allow students to achieve a specific level by design, not by performance.
+* The results presented have reduced variance due to the group nature of the artifacts.  If individual reports were used, there would most likely be a greater distribution and variance in the results.
+
+## Transferable Learning Orienations Survey Results
+
+The results of the TLO are presented below. When the survey was administered, along with the number of responses is illustrated in the table below.
+
+```{r, tlo table}
+
+tlo %>% 
+  count(year, subject, course) %>% 
+  unite(course, subject, course, sep = " ") %>% 
+  ungroup %>% 
+  mutate(year = factor(year, c(1,2,3,4), c("2013-2014","2014-2015", "2015-2016", "2016-2017"))) %>% 
+  kable(col.names = stringr::str_to_title(names(.)))
+```
+
+There may be limited responses to the TLO in second year of the project, so in certain departments no connection can be shown that illustrates the changes that occur between first and second year. The results are also from a previous version of the TLO, which include Self-efficacy.  The current version of the instrument has merged Self-efficacy with Organization, and added additional items to other scales.
+
+When interpreting these results keep in mind that respondents will answer surveys with an ideal version of themselves in mind.  This results in a high rating for the self-rating questions (which provides them the opportunity to indicate what is the most like them).  The scale items provide a less biased representation of the student by aggregating the discrete aspects of the scale into a whole.  The interesting aspect to note is the difference between the two.  By looking at the differences, programs can see the types of students that are entering their program and use the information to:
+
+* Provide targeted support in gap areas
+* Provide to instructors to adapt teaching strategies
+* Identify how programming and curriculum can improve these aspects in their students.
+
+Ideally, should longitudinal data for this survey exist programs could use it to see how their program influences these aspects of students, and how they can improve to better support and develop students as they complete the progam.
+
+These results presented below are horizontal histograms aggregate of all students, paneled by year when possible.  The charts contrast each of the scale items of the TLO showing the instrument calculated score of the student (mean score of scale items), alongside their self rating. 
+
+```{r TLO_results, fig.width = 32, fig.height = 20,  fig.cap = paste0(params$dept_title, ": Transferrable Learning Orientations Results"), fig.fullwidth = TRUE}
+
+
+om_resp <-  c(
+  "My main motivation for learning is to avoid letting others down or being seen as a failure.",
+  "My main motivation is academic success, but I still enjoy exploring the subject matter.",
+  "My motivation to understand the subject matter is as important to me as my academic success.",
+  "I am motivated by intense curiosity to understand subject matter; academic success is a secondary concern."
+  )
+
+lb_resp <- c(
+  "My academic performance is dependent on factors I cannot control.",
+  "I have some control over the factors affecting my academic performance.",
+  "I am adaptable and can control most of the factors affecting my academic performance.",
+  "I am capable of changing my thinking or approach to learning; I have total control over my academic performance."
+  )
+
+se_resp <- c(
+  "I feel tentative about having the knowledge/ skills I needed to meet the course requirements.",
+  "I feel confident that my knowledge/ skills are adequate to meet most of the course requirements.",
+  "I feel confident that I have the expected level of knowledge/ skills to meet all of the course requirements.",
+  "I feel very confident that I have all of the necessary knowledge/ skills to excel in meeting all of the course requirements."
+  )
+
+tr_resp <- c(
+  "I preferred to memorize key information as it pertained to a specific subject, but sometimes thought about where learned similar things.",
+  "I preferred to memorize key information, but also related ideas to what I had learned previously.",
+  "I consistently connected new ideas to what I already know when I applied my knowledge and skills in my courses.",
+  "I made meaningful connections between new and previous learning when I applied knowledge and skills creatively across my courses."
+  )
+
+or_resp <- c(
+"My organization was inconsistent; I changed plans regularly to suit my personal needs.",
+"I tried to organize my work processes, and attempted to structure my study schedules according to deadlines.",
+"I actively organized my schedules according to my short-term and long-term goals.",
+"I strategically managed my schedules, and made necessary accommodations, in prioritizing to meet all of my goals."
+)
+
+sr_resp <- c(
+    "I work to the best of my ability, even when I don’t always know exactly what is required.",
+"I make sure I know what I need to do, and try different strategies meet course requirements.",
+"I always direct my attention appropriately and manage my learning to meet course requirements.",
+"I excel in my courses by systematically structuring my learning, compensating for any gaps in knowledge or skills."
+)
+
+scale_labels <- data_frame(scale = c("om","or","se","lb","sr","tr"), labels = list(om_resp, or_resp, se_resp, lb_resp, sr_resp, tr_resp))
+
+scale_data <- tlo %>% 
+  select_if(is_numeric) %>% 
+  gather(item, value, -studentid:-term, -year) %>% 
+  mutate(scale = substr(item, 0,2),
+         year = factor(year,c(1,2,3,4), c("2013-2014","2014-2015", "2015-2016", "2016-2017"))) %>% 
+  filter(!grepl("(\\w+6)", item)) %>% 
+  group_by(studentid, year, scale) %>% 
+  summarize(mean = mean(value, na.rm = TRUE)) %>% 
+  mutate(mean = scales::rescale(mean, to = c(1,4))) %>% 
+  mutate(mean = as.numeric(cut(mean,c(0,1,2,3,4), labels = c(1,2,3,4))))
+
+selfrated_data <- tlo %>% 
+  select_if(is_numeric) %>% 
+  gather(item, value, -studentid:-term, -year) %>% 
+  mutate(scale = substr(item, 0,2),
+         year = factor(year,c(1,2,3,4), c("2013-2014","2014-2015", "2015-2016", "2016-2017"))) %>% 
+  filter(grepl("(\\w+6)", item)) %>% 
+  group_by(studentid, year, scale) %>% 
+  summarize(self_rating = floor(mean(value, na.rm = TRUE))) 
+
+
+
+# Data for histograms below:
+plot_data <- left_join(scale_data, selfrated_data) %>%
+  gather(rating, value, -scale, -studentid, -year) %>% 
+  group_by(year, scale, rating, value) %>% 
+  summarize(n = n()) %>% 
+  ungroup %>% 
+  complete(nesting(year,scale), rating, value, fill = list(n = NA_integer_)) %>% 
+  group_by(scale) %>% 
+  nest() %>% 
+  left_join(scale_labels) %>% 
+  mutate(scale = factor(scale, labels = c(
+   "OM" = "Outcome Motivation",
+   "OR" = "Organization",
+   "SE" = "Self-efficacy",
+   "LB" = "Learning Belief",
+   "SR" = "Self Regulation",
+   "TR" = "Transfer")
+  )) %>% 
+  mutate(scale = as.character(scale))
+
+tlo_item_hist <- function(data, labels, scale) {
+  
+  ggplot(data, aes(x = factor(value), y = n)) +
+    geom_col(aes(fill = factor(rating)), position = position_dodge(), width = 0.5) +
+    coord_flip() +
+    scale_x_discrete(labels = str_wrap(labels, 50)) +
+    scale_y_continuous(breaks = pretty_breaks()) +
+    scale_fill_grey(name = "", labels = c("Scale Rating", "Self Rating")) +
+    labs(x = NULL, y = "Count", title = scale) +
+    facet_wrap(~year) +
+    theme_tufte(base_size = 20) +
+    theme(legend.position = "bottom",
+          strip.text.y = element_text(angle = 0),
+          axis.title.y = element_text(angle = 0),
+          axis.text.y = element_text(size = rel(1.5)),
+          axis.ticks.y = element_blank())
+}
+
+count <- scale_data %>% group_by(studentid) %>% select(studentid) %>% distinct %>% nrow()
+
+if (count <= 5) {
+ 
+   df <- data.frame()
+  
+  ggplot(df) + geom_point() + xlim(0, 10) + ylim(0, 10) +
+    annotate("text",5,5, label = "Too few reponses to the TLO", color = "grey50") +
+    theme(rect = element_blank(),
+        text = element_blank(),
+        line = element_blank(),
+        title = element_blank())
+} else {
+
+ plot_data <- plot_data %>% 
+   mutate(plots = pmap(., tlo_item_hist))
+
+grid.arrange(grobs = plot_data$plots, ncol = 2)
+}    
+```
+
+## Confounding Factors
+
+As with all surveys, this is qualitative and self-reported.  However, the TLO has been developed and tested to ensure psychometic validity and reliability and future versions and improvements are being considered. 
+
+
+[^heqco]: http://www.heqco.ca
+[^qlop]: http://www.queensu.ca/qloa/home
+[^tools]: http://www.queensu.ca/qloa/assessment-tools
+[^cla+]: http://cae.org/
+[^cat]: http://www.tntech.edu/cat
+[^value]: http://www.aacu.org/value/rubrics
+[^tlo]: http://www.queensu.ca/qloa/assessment-tools/transferable-learning-orientations-tlo-survey
+[^mastery]: bit.ly/intrp_cla_results
+[^clarubric]: http://cae.org/images/uploads/pdf/CLA_Plus_Practice_PT.pdf
